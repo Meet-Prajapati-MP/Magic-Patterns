@@ -34,6 +34,12 @@ export function BuyerCreateInvoicePage() {
   // Form State
   const [selectedClient, setSelectedClient] = useState('');
   const [selectedService, setSelectedService] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [clientEmailError, setClientEmailError] = useState('');
+  const [clientGstin, setClientGstin] = useState('');
+  const [clientGstinError, setClientGstinError] = useState('');
+  const [clientAddress, setClientAddress] = useState('');
+  const [clientAddressError, setClientAddressError] = useState('');
   const [taxEnabled, setTaxEnabled] = useState(true);
   const [paymentType, setPaymentType] = useState('full');
   const [items, setItems] = useState([
@@ -249,10 +255,61 @@ export function BuyerCreateInvoicePage() {
               <Input
             label="Email Address"
             type="email"
-            placeholder="billing@acme.com" />
+            placeholder="billing@acme.com"
+            value={clientEmail}
+            onChange={(e) => {
+              setClientEmail(e.target.value);
+              if (clientEmailError) setClientEmailError('');
+            }}
+            onBlur={() => {
+              const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+              if (!clientEmail) {
+                setClientEmailError('Email is required');
+              } else if (!re.test(clientEmail)) {
+                setClientEmailError('Enter a valid email address');
+              } else {
+                setClientEmailError('');
+              }
+            }}
+            required
+            error={clientEmailError} />
 
-              <Input label="GSTIN (Optional)" placeholder="22AAAAA0000A1Z5" />
-              <Input label="Address" placeholder="123 Business Park" />
+              <Input
+            label="GSTIN (Optional)"
+            placeholder="22AAAAA0000A1Z5"
+            value={clientGstin}
+            onChange={(e) => {
+              setClientGstin(e.target.value);
+              if (clientGstinError) setClientGstinError('');
+            }}
+            onBlur={() => {
+              const gst = clientGstin.trim().toUpperCase();
+              const re = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[A-Z0-9]{1}Z[A-Z0-9]{1}$/;
+              if (gst && !re.test(gst)) {
+                setClientGstinError('Enter a valid GSTIN');
+              } else {
+                setClientGstinError('');
+              }
+            }}
+            error={clientGstinError}
+          />
+              <Input
+            label="Address"
+            placeholder="123 Business Park"
+            value={clientAddress}
+            onChange={(e) => {
+              setClientAddress(e.target.value);
+              if (clientAddressError) setClientAddressError('');
+            }}
+            onBlur={() => {
+              if (!clientAddress.trim()) {
+                setClientAddressError('Address is required');
+              } else {
+                setClientAddressError('');
+              }
+            }}
+            required
+            error={clientAddressError} />
             </div>
         }
         </CardContent>
@@ -637,7 +694,11 @@ export function BuyerCreateInvoicePage() {
           <Button
             onClick={() => setStep(Math.min(3, step + 1))}
             rightIcon={<ArrowRight className="h-4 w-4" />}
-            disabled={step === 1 && (!selectedClient || !selectedService)}>
+            disabled={
+              step === 1 && (
+                !selectedClient || !selectedService || clientEmailError || clientGstinError || clientAddressError || (selectedClient && !clientEmail) || (selectedClient && !clientAddress)
+              )
+            }>
 
               Next Step
             </Button> :

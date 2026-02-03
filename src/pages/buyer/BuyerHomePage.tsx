@@ -43,7 +43,7 @@ export function BuyerHomePage() {
               <Link to="/buyer/create-invoice">
                 <Button
                   variant="outline"
-                  className="text-blue-700 border-[#DBEAFE] bg-[#F0F9FF] hover:bg-[#E0F2FE] transition-colors duration-200"
+                  className="text-blue-700 border-[#DBEAFE] bg-[#F0F2F4] hover:bg-[#FFFFFF] transition-colors duration-200"
                   leftIcon={<PlusCircle className="h-4 w-4" />}>
 
                   Create Invoice

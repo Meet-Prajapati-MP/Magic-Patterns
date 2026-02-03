@@ -33,6 +33,12 @@ export function CreateInvoicePage() {
   const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false);
   // Form State
   const [selectedClient, setSelectedClient] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [clientEmailError, setClientEmailError] = useState('');
+  const [clientGstin, setClientGstin] = useState('');
+  const [clientGstinError, setClientGstinError] = useState('');
+  const [clientAddress, setClientAddress] = useState('');
+  const [clientAddressError, setClientAddressError] = useState('');
   const [taxEnabled, setTaxEnabled] = useState(true);
   const [paymentType, setPaymentType] = useState('full');
   const [items, setItems] = useState([
@@ -96,6 +102,9 @@ export function CreateInvoicePage() {
   const calculateTotal = () => {
     return calculateSubtotal() + calculateTax();
   };
+  const areItemsValid = () => {
+    return items.every((item) => item.desc && item.desc.toString().trim() !== '' && Number(item.qty) > 0 && Number(item.rate) > 0);
+  };
   const addMilestone = () => {
     setMilestones([
     ...milestones,
@@ -143,6 +152,13 @@ export function CreateInvoicePage() {
       navigate('/seller/invoices');
     }, 1500);
   };
+  const isFormValid = () => {
+  return items.every(item => 
+    item.desc.trim() !== '' && 
+    item.qty > 0 && 
+    item.rate > 0
+  );
+};
   const handleAddClient = (e: React.FormEvent) => {
     e.preventDefault();
     // In real app, get values from form
@@ -206,10 +222,60 @@ export function CreateInvoicePage() {
               <Input
             label="Email Address"
             type="email"
-            placeholder="billing@acme.com" />
+            placeholder="billing@acme.com"
+            value={clientEmail}
+            onChange={(e) => {
+              setClientEmail(e.target.value);
+              if (clientEmailError) setClientEmailError('');
+            }}
+            onBlur={() => {
+              const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+              if (!clientEmail) {
+                setClientEmailError('Email is required');
+              } else if (!re.test(clientEmail)) {
+                setClientEmailError('Enter a valid email address');
+              } else {
+                setClientEmailError('');
+              }
+            }}
+            required
+            error={clientEmailError} />
 
-              <Input label="GSTIN (Optional)" placeholder="22AAAAA0000A1Z5" />
-              <Input label="Address" placeholder="123 Business Park" />
+              <Input
+            label="GSTIN (Optional)"
+            placeholder="22AAAAA0000A1Z5"
+            value={clientGstin}
+            onChange={(e) => {
+              setClientGstin(e.target.value);
+              if (clientGstinError) setClientGstinError('');
+            }}
+            onBlur={() => {
+              const gst = clientGstin.trim().toUpperCase();
+              const re = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[A-Z0-9]{1}Z[A-Z0-9]{1}$/;
+              if (gst && !re.test(gst)) {
+                setClientGstinError('Enter a valid GSTIN');
+              } else {
+                setClientGstinError('');
+              }
+            }}
+            error={clientGstinError} />
+              <Input
+            label="Address"
+            placeholder="123 Business Park"
+            value={clientAddress}
+            onChange={(e) => {
+              setClientAddress(e.target.value);
+              if (clientAddressError) setClientAddressError('');
+            }}
+            onBlur={() => {
+              if (!clientAddress.trim()) {
+                setClientAddressError('Address is required');
+              } else {
+                setClientAddressError('');
+              }
+            }}
+            required
+            error={clientAddressError} />
             </div>
         }
         </CardContent>
@@ -246,7 +312,9 @@ export function CreateInvoicePage() {
                   const newItems = [...items];
                   newItems[index].desc = e.target.value;
                   setItems(newItems);
-                }} />
+                }}
+                error={item.desc.trim()==='' ? 'Description is required' : ''}
+                 />
 
                 </div>
                 <div className="w-24">
@@ -258,7 +326,8 @@ export function CreateInvoicePage() {
                   const newItems = [...items];
                   newItems[index].qty = parseInt(e.target.value) || 0;
                   setItems(newItems);
-                }} />
+                }}
+                error={item.qty <= 0 ? 'Quantity must be greater than 0' : ''} />
 
                 </div>
                 <div className="w-32">
@@ -270,7 +339,8 @@ export function CreateInvoicePage() {
                   const newItems = [...items];
                   newItems[index].rate = parseFloat(e.target.value) || 0;
                   setItems(newItems);
-                }} />
+                }} 
+                error={item.rate <= 0 ? 'Rate must be greater than 0' : ''}/>
 
                 </div>
                 <div className="w-32 pb-2 text-right font-medium text-slate-900">
@@ -607,12 +677,27 @@ export function CreateInvoicePage() {
 
           {step < 3 ?
           <Button
-            onClick={() => setStep(Math.min(3, step + 1))}
-            rightIcon={<ArrowRight className="h-4 w-4" />}
-            disabled={step === 1 && !selectedClient}>
-
-              Next Step
-            </Button> :
+  onClick={() => setStep(Math.min(3, step + 1))}
+  rightIcon={<ArrowRight className="h-4 w-4" />}
+  disabled={
+    (step === 1 && (
+      !selectedClient || 
+      clientEmailError || 
+      clientGstinError || 
+      clientAddressError || 
+      (selectedClient && !clientEmail) || 
+      (selectedClient && !clientAddress)
+    )) ||
+    (step === 2 && ( 
+      !items.every(item => 
+        item.desc.trim() !== '' && 
+        item.qty <= 0 && 
+        item.rate <= 0
+      )
+    ))
+  }>
+  Next Step
+</Button> :
 
           <Button
             onClick={handleSendInvoice}
