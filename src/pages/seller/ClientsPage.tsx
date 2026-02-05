@@ -27,6 +27,16 @@ export function ClientsPage() {
     message: string;
     type: 'success' | 'error';
   } | null>(null);
+  // Form state
+  const [companyName, setCompanyName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  // Validation errors
+  const [companyNameError, setCompanyNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  // Track if form has been submitted
+  const [formSubmitted, setFormSubmitted] = useState(false);
   const [clients, setClients] = useState([
   {
     id: 1,
@@ -75,6 +85,113 @@ export function ClientsPage() {
       type: 'success'
     });
     setTimeout(() => setShowToast(null), 3000);
+  };
+
+  // Validation functions
+  const validateEmail = (emailValue: string): string => {
+    if (!emailValue.trim()) {
+      return 'Email is required';
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailValue)) {
+      return 'Please enter a valid email address';
+    }
+    return '';
+  };
+
+  const validatePhone = (phoneValue: string): string => {
+    if (!phoneValue.trim()) {
+      return 'Phone number is required';
+    }
+    // Remove all non-digit characters and check for exactly 10 digits
+    const digitsOnly = phoneValue.replace(/\D/g, '');
+    if (digitsOnly.length !== 10) {
+      return 'Phone number must be exactly 10 digits';
+    }
+    return '';
+  };
+
+  const validateCompanyName = (name: string): string => {
+    if (!name.trim()) {
+      return 'Company name is required';
+    }
+    return '';
+  };
+
+  const handleCompanyNameChange = (value: string) => {
+    setCompanyName(value);
+    if (formSubmitted) {
+      setCompanyNameError(validateCompanyName(value));
+    }
+  };
+
+  const handleEmailChange = (value: string) => {
+    setEmail(value);
+    if (formSubmitted) {
+      setEmailError(validateEmail(value));
+    }
+  };
+
+  const handlePhoneChange = (value: string) => {
+    setPhone(value);
+    if (formSubmitted) {
+      setPhoneError(validatePhone(value));
+    }
+  };
+
+  const isFormValid = (): boolean => {
+    return (
+      companyName.trim() !== '' &&
+      email.trim() !== '' &&
+      phone.trim() !== '' &&
+      companyNameError === '' &&
+      emailError === '' &&
+      phoneError === ''
+    );
+  };
+
+  const handleAddClient = () => {
+    setFormSubmitted(true);
+    // Validate all fields
+    const nameErr = validateCompanyName(companyName);
+    const emailErr = validateEmail(email);
+    const phoneErr = validatePhone(phone);
+
+    setCompanyNameError(nameErr);
+    setEmailError(emailErr);
+    setPhoneError(phoneErr);
+
+    if (nameErr || emailErr || phoneErr) {
+      return;
+    }
+
+    // Add client logic here
+    setIsAddModalOpen(false);
+    setShowToast({
+      message: 'Client saved successfully',
+      type: 'success'
+    });
+    setTimeout(() => setShowToast(null), 3000);
+
+    // Reset form
+    setCompanyName('');
+    setEmail('');
+    setPhone('');
+    setCompanyNameError('');
+    setEmailError('');
+    setPhoneError('');
+  };
+
+  const handleModalClose = () => {
+    setIsAddModalOpen(false);
+    // Reset form on close
+    setCompanyName('');
+    setEmail('');
+    setPhone('');
+    setCompanyNameError('');
+    setEmailError('');
+    setPhoneError('');
+    setFormSubmitted(false);
   };
   return (
     <SellerLayout>
@@ -221,18 +338,31 @@ export function ClientsPage() {
         {/* Add/Edit Client Modal */}
         <Modal
           isOpen={isAddModalOpen}
-          onClose={() => setIsAddModalOpen(false)}
+          onClose={handleModalClose}
           title="Add New Client">
 
           <div className="space-y-4">
-            <Input label="Client / Company Name" placeholder="e.g. Acme Corp" />
+            <Input
+              label="Client / Company Name"
+              placeholder="e.g. Acme Corp"
+              value={companyName}
+              onChange={(e) => handleCompanyNameChange(e.target.value)}
+              error={formSubmitted ? companyNameError : ''} />
             <div className="grid grid-cols-2 gap-4">
               <Input
                 label="Email"
                 type="email"
-                placeholder="billing@acme.com" />
+                placeholder="billing@acme.com"
+              value={email}
+              onChange={(e) => handleEmailChange(e.target.value)}
+              error={formSubmitted ? emailError : ''} />
 
-              <Input label="Phone" placeholder="+91" />
+              <Input
+                label="Phone"
+                placeholder="+91 98765 43210"
+              value={phone}
+              onChange={(e) => handlePhoneChange(e.target.value)}
+              error={formSubmitted ? phoneError : ''} />
             </div>
             <Input label="GSTIN (Optional)" placeholder="22AAAAA0000A1Z5" />
             <div>
@@ -246,14 +376,8 @@ export function ClientsPage() {
             </div>
             <Button
               className="w-full"
-              onClick={() => {
-                setIsAddModalOpen(false);
-                setShowToast({
-                  message: 'Client saved successfully',
-                  type: 'success'
-                });
-                setTimeout(() => setShowToast(null), 3000);
-              }}>
+              onClick={handleAddClient}
+              disabled={!isFormValid()}>
 
               Save Client
             </Button>

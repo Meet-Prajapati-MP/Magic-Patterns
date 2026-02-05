@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Search,
   Filter,
@@ -18,6 +18,7 @@ import { Dropdown } from '../../components/ui/Dropdown';
 import { Modal } from '../../components/ui/Modal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Toast } from '../../components/ui/Toast';
+import { getSellerInvoices, formatAmount, formatDate } from '../../services/invoiceService';
 export function InvoiceListPage() {
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,49 +50,61 @@ export function InvoiceListPage() {
     label: 'Overdue'
   }];
 
-  // Mock Data
-  const [invoices, setInvoices] = useState([
-  {
-    id: 'INV-001',
-    client: 'Acme Corp',
-    date: '24 Jan 2024',
-    due: '31 Jan 2024',
-    amount: '₹45,000',
-    status: 'paid'
-  },
-  {
-    id: 'INV-002',
-    client: 'TechStart Inc',
-    date: '22 Jan 2024',
-    due: '29 Jan 2024',
-    amount: '₹1,20,000',
-    status: 'pending'
-  },
-  {
-    id: 'INV-003',
-    client: 'Design Studio',
-    date: '15 Jan 2024',
-    due: '22 Jan 2024',
-    amount: '₹15,000',
-    status: 'overdue'
-  },
-  {
-    id: 'INV-004',
-    client: 'Global Services',
-    date: '25 Jan 2024',
-    due: '-',
-    amount: '₹85,000',
-    status: 'draft'
-  },
-  {
-    id: 'INV-005',
-    client: 'Alpha Wave',
-    date: '10 Jan 2024',
-    due: '17 Jan 2024',
-    amount: '₹32,500',
-    status: 'paid'
-  }]
-  );
+  // Invoice data from Supabase
+  const [invoices, setInvoices] = useState<Array<{
+    id: string;
+    client: string;
+    date: string;
+    due: string;
+    amount: string;
+    status: string;
+  }>>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch invoices from Supabase
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      setIsLoading(true);
+      console.log('📋 Fetching invoices...');
+      
+      const { data, error } = await getSellerInvoices();
+      
+      if (error) {
+        console.error('❌ Error fetching invoices:', error);
+        setShowToast({
+          message: `Failed to load invoices: ${error}`,
+          type: 'error'
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('✅ Fetched invoices:', data?.length || 0, 'invoices');
+      console.log('Invoice data:', data);
+      
+      if (data && data.length > 0) {
+        // Transform Supabase data to UI format
+        const transformedInvoices = data.map(invoice => ({
+          id: invoice.invoice_number,
+          client: invoice.client_name,
+          date: formatDate(invoice.invoice_date),
+          due: invoice.due_date ? formatDate(invoice.due_date) : '-',
+          amount: formatAmount(invoice.total_amount),
+          status: invoice.status
+        }));
+        setInvoices(transformedInvoices);
+        console.log('✅ Transformed invoices:', transformedInvoices.length, 'invoices');
+      } else {
+        console.log('ℹ️ No invoices found. This is normal if you haven\'t created any invoices yet.');
+        setInvoices([]);
+        // Don't show error toast for empty data - it's normal
+      }
+      
+      setIsLoading(false);
+    };
+
+    fetchInvoices();
+  }, []);
   // Filter Logic
   const filteredInvoices = useMemo(() => {
     return invoices.filter((invoice) => {
@@ -151,7 +164,7 @@ export function InvoiceListPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h2 className="text-2xl font-bold text-slate-900">Invoices</h2>
           <Link to="/seller/invoices/create">
-            <Button className="text-blue-700 border-[#DBEAFE] bg-[#F0F9FF] hover:bg-[#E0F2FE] transition-colors duration-200" leftIcon={<Plus className="h-4 w-4" />}>
+            <Button variant="outline" className="text-blue-700 border-[#DBEAFE] bg-white hover:bg-[#F0F9FF] transition-colors duration-200" leftIcon={<Plus className="h-4 w-4" />}>
               Create Invoice
             </Button>
           </Link>
@@ -231,7 +244,13 @@ export function InvoiceListPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {filteredInvoices.length > 0 ?
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-slate-500">
+                      Loading invoices...
+                    </td>
+                  </tr>
+                ) : filteredInvoices.length > 0 ? (
                 filteredInvoices.map((invoice) =>
                 <tr
                   key={invoice.id}

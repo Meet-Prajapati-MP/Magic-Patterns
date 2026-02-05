@@ -202,8 +202,7 @@ export function SolutionsPage() {
               </p>
               <ul className="text-sm space-y-2 text-slate-500">
                 <li className="flex items-center">
-                  <CheckCircle className="h-3 w-3 mr-2 text-green-500" />{' '}
-                  Monthly retainers
+                  <CheckCircle className="h-3 w-3 mr-2 text-green-500" /> Monthly retainers
                 </li>
                 <li className="flex items-center">
                   <CheckCircle className="h-3 w-3 mr-2 text-green-500" /> Time
@@ -224,8 +223,7 @@ export function SolutionsPage() {
               </p>
               <ul className="text-sm space-y-2 text-slate-500">
                 <li className="flex items-center">
-                  <CheckCircle className="h-3 w-3 mr-2 text-green-500" />{' '}
-                  Instant payment links
+                  <CheckCircle className="h-3 w-3 mr-2 text-green-500" /> Instant payment links
                 </li>
                 <li className="flex items-center">
                   <CheckCircle className="h-3 w-3 mr-2 text-green-500" /> Order

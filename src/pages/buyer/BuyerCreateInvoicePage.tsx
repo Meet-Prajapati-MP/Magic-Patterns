@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -31,6 +31,25 @@ export function BuyerCreateInvoicePage() {
     type: 'success' | 'error';
   } | null>(null);
   const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false);
+  // Add Client Form State
+  const [newClientCompanyName, setNewClientCompanyName] = useState('');
+  const [newClientEmail, setNewClientEmail] = useState('');
+  const [newClientPhone, setNewClientPhone] = useState('');
+  // Add Client Validation errors
+  const [newClientCompanyNameError, setNewClientCompanyNameError] = useState('');
+  const [newClientEmailError, setNewClientEmailError] = useState('');
+  const [newClientPhoneError, setNewClientPhoneError] = useState('');
+  // Track if Add Client form has been submitted
+  const [addClientFormSubmitted, setAddClientFormSubmitted] = useState(false);
+  // Track if items form has been submitted (for step 2)
+  const [itemsFormSubmitted, setItemsFormSubmitted] = useState(false);
+  // Payment section state
+  const [dueDate, setDueDate] = useState('');
+  const [notes, setNotes] = useState('');
+  const [dueDateError, setDueDateError] = useState('');
+  const [notesError, setNotesError] = useState('');
+  // Track if payment form has been submitted
+  const [paymentFormSubmitted, setPaymentFormSubmitted] = useState(false);
   // Form State
   const [selectedClient, setSelectedClient] = useState('');
   const [selectedService, setSelectedService] = useState('');
@@ -136,7 +155,46 @@ export function BuyerCreateInvoicePage() {
     });
     setTimeout(() => setShowToast(null), 3000);
   };
+  const validateDueDate = (dateValue: string): string => {
+    if (!dateValue.trim()) {
+      return 'Due date is required';
+    }
+    return '';
+  };
+
+  const validateNotes = (notesValue: string): string => {
+    if (!notesValue.trim()) {
+      return 'Notes is required';
+    }
+    return '';
+  };
+
   const handleSendInvoice = () => {
+    setPaymentFormSubmitted(true);
+    
+    // Validate payment fields when payment type is 'full'
+    if (paymentType === 'full') {
+      const dateErr = validateDueDate(dueDate);
+      const notesErr = validateNotes(notes);
+      
+      setDueDateError(dateErr);
+      setNotesError(notesErr);
+      
+      if (dateErr || notesErr) {
+        return;
+      }
+    }
+    
+    // Validate milestone/split payment due dates
+    if (paymentType === 'milestone' || paymentType === 'split') {
+      const notesErr = validateNotes(notes);
+      setNotesError(notesErr);
+      
+      if (!validateMilestoneDueDates() || notesErr) {
+        return;
+      }
+    }
+
     setShowToast({
       message: 'Invoice sent successfully!',
       type: 'success'
@@ -145,11 +203,68 @@ export function BuyerCreateInvoicePage() {
       navigate('/buyer/invoices'); // Or a "Sent Invoices" page if separate
     }, 1500);
   };
+  // Validation functions for Add Client
+  const validateEmail = (emailValue: string): string => {
+    if (!emailValue.trim()) {
+      return 'Email is required';
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailValue)) {
+      return 'Please enter a valid email address';
+    }
+    return '';
+  };
+
+  const validatePhone = (phoneValue: string): string => {
+    if (!phoneValue.trim()) {
+      return 'Phone number is required';
+    }
+    // Remove all non-digit characters and check for exactly 10 digits
+    const digitsOnly = phoneValue.replace(/\D/g, '');
+    if (digitsOnly.length !== 10) {
+      return 'Phone number must be exactly 10 digits';
+    }
+    return '';
+  };
+
+  const validateCompanyName = (name: string): string => {
+    if (!name.trim()) {
+      return 'Company name is required';
+    }
+    return '';
+  };
+
+  const isAddClientFormValid = (): boolean => {
+    return (
+      newClientCompanyName.trim() !== '' &&
+      newClientEmail.trim() !== '' &&
+      newClientPhone.trim() !== '' &&
+      newClientCompanyNameError === '' &&
+      newClientEmailError === '' &&
+      newClientPhoneError === ''
+    );
+  };
+
   const handleAddClient = (e: React.FormEvent) => {
     e.preventDefault();
+    setAddClientFormSubmitted(true);
+    
+    // Validate all fields
+    const nameErr = validateCompanyName(newClientCompanyName);
+    const emailErr = validateEmail(newClientEmail);
+    const phoneErr = validatePhone(newClientPhone);
+
+    setNewClientCompanyNameError(nameErr);
+    setNewClientEmailError(emailErr);
+    setNewClientPhoneError(phoneErr);
+
+    if (nameErr || emailErr || phoneErr) {
+      return;
+    }
+
     const newClient = {
       value: Date.now().toString(),
-      label: 'New Client Company'
+      label: newClientCompanyName
     };
     setClients([...clients, newClient]);
     setSelectedClient(newClient.value);
@@ -159,6 +274,27 @@ export function BuyerCreateInvoicePage() {
       type: 'success'
     });
     setTimeout(() => setShowToast(null), 3000);
+
+    // Reset form
+    setNewClientCompanyName('');
+    setNewClientEmail('');
+    setNewClientPhone('');
+    setNewClientCompanyNameError('');
+    setNewClientEmailError('');
+    setNewClientPhoneError('');
+    setAddClientFormSubmitted(false);
+  };
+
+  const handleAddClientModalClose = () => {
+    setIsAddClientModalOpen(false);
+    // Reset form on close
+    setNewClientCompanyName('');
+    setNewClientEmail('');
+    setNewClientPhone('');
+    setNewClientCompanyNameError('');
+    setNewClientEmailError('');
+    setNewClientPhoneError('');
+    setAddClientFormSubmitted(false);
   };
   const addMilestone = () => {
     setMilestones([
@@ -176,7 +312,7 @@ export function BuyerCreateInvoicePage() {
       setMilestones(milestones.filter((m) => m.id !== id));
     }
   };
-  const updateMilestone = (id: number, field: string, value: any) => {
+  const updateMilestone = (id: number, field: string, value: string | number) => {
     setMilestones(
       milestones.map((m) =>
       m.id === id ?
@@ -188,9 +324,49 @@ export function BuyerCreateInvoicePage() {
       )
     );
   };
+
+  // Ensure split payment always has 2 fixed payments at 50% each
+  useEffect(() => {
+    if (paymentType === 'split') {
+      setMilestones((prevMilestones) => [
+        {
+          id: 1,
+          description: 'Payment 1',
+          percentage: 50,
+          dueDate: prevMilestones[0]?.dueDate || ''
+        },
+        {
+          id: 2,
+          description: 'Payment 2',
+          percentage: 50,
+          dueDate: prevMilestones[1]?.dueDate || ''
+        }
+      ]);
+    }
+  }, [paymentType]);
+
   const getTotalPercentage = () => {
-    return milestones.reduce((acc, m) => acc + (m.percentage || 0), 0);
+    return milestones.reduce((acc, m) => acc + (Number(m.percentage) || 0), 0);
   };
+
+  const getMilestonePercentageError = (milestoneId: number): string => {
+    if (!paymentFormSubmitted) {
+      return '';
+    }
+    const total = getTotalPercentage();
+    if (total !== 100) {
+      return `Total must equal 100% (Current: ${total}%)`;
+    }
+    return '';
+  };
+
+  const validateMilestoneDueDates = (): boolean => {
+    if (paymentType === 'milestone' || paymentType === 'split') {
+      return milestones.every(m => m.dueDate.trim() !== '');
+    }
+    return true;
+  };
+
   const renderStep1 = () =>
   <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
       <Card>
@@ -346,7 +522,8 @@ export function BuyerCreateInvoicePage() {
                   const newItems = [...items];
                   newItems[index].desc = e.target.value;
                   setItems(newItems);
-                }} />
+                }}
+                error={itemsFormSubmitted && item.desc.trim() === '' ? 'Description is required' : ''} />
 
                 </div>
                 <div className="w-24">
@@ -358,7 +535,8 @@ export function BuyerCreateInvoicePage() {
                   const newItems = [...items];
                   newItems[index].qty = parseInt(e.target.value) || 0;
                   setItems(newItems);
-                }} />
+                }}
+                error={itemsFormSubmitted && Number(item.qty) <= 0 ? 'Quantity must be greater than 0' : ''} />
 
                 </div>
                 <div className="w-32">
@@ -370,7 +548,8 @@ export function BuyerCreateInvoicePage() {
                   const newItems = [...items];
                   newItems[index].rate = parseFloat(e.target.value) || 0;
                   setItems(newItems);
-                }} />
+                }}
+                error={itemsFormSubmitted && Number(item.rate) <= 0 ? 'Rate must be greater than 0' : ''} />
 
                 </div>
                 <div className="w-32 pb-2 text-right font-medium text-slate-900">
@@ -495,7 +674,16 @@ export function BuyerCreateInvoicePage() {
 
           {paymentType === 'full' &&
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <DatePicker label="Due Date" />
+              <DatePicker
+                label="Due Date"
+                value={dueDate}
+                onChange={(e) => {
+                  setDueDate(e.target.value);
+                  if (paymentFormSubmitted) {
+                    setDueDateError(validateDueDate(e.target.value));
+                  }
+                }}
+                error={paymentFormSubmitted ? dueDateError : ''} />
             </div>
         }
 
@@ -555,33 +743,31 @@ export function BuyerCreateInvoicePage() {
                   label="Percentage (%)"
                   type="number"
                   placeholder="50"
-                  value={milestone.percentage}
+                  value={paymentType === 'split' ? 50 : milestone.percentage}
+                  onChange={(e) => {
+                    if (paymentType !== 'split') {
+                      updateMilestone(
+                        milestone.id,
+                        'percentage',
+                        parseInt(e.target.value) || 0
+                      );
+                    }
+                  }}
+                  error={paymentType === 'milestone' ? getMilestonePercentageError(milestone.id) : ''}
+                  disabled={paymentType === 'split'}
+                  readOnly={paymentType === 'split'} />
+
+                      <DatePicker
+                  label="Due Date"
+                  value={milestone.dueDate}
                   onChange={(e) =>
                   updateMilestone(
                     milestone.id,
-                    'percentage',
-                    parseInt(e.target.value) || 0
+                    'dueDate',
+                    e.target.value
                   )
                   }
-                  disabled={paymentType === 'split'} />
-
-                      <div className="space-y-1.5">
-                        <label className="block text-sm font-medium text-slate-700">
-                          Due Date
-                        </label>
-                        <input
-                    type="date"
-                    className="w-full rounded-md border border-slate-300 p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    value={milestone.dueDate}
-                    onChange={(e) =>
-                    updateMilestone(
-                      milestone.id,
-                      'dueDate',
-                      e.target.value
-                    )
-                    } />
-
-                      </div>
+                  error={paymentFormSubmitted && !milestone.dueDate.trim() ? 'Due date is required' : ''} />
                     </div>
 
                     <div className="text-sm text-slate-600">
@@ -597,21 +783,34 @@ export function BuyerCreateInvoicePage() {
 
               {getTotalPercentage() !== 100 &&
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-                  Total percentage must equal 100%. Currently:{' '}
-                  {getTotalPercentage()}%
+                  Total percentage must equal 100%. Currently: {getTotalPercentage()}%
                 </div>
           }
             </div>
         }
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Notes / Terms
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-slate-700">
+                Notes / Terms
+              </label>
+              {paymentFormSubmitted && notesError &&
+              <span className="text-xs text-red-500 font-medium ml-2">{notesError}</span>
+              }
+            </div>
             <textarea
-            className="w-full rounded-md border border-slate-300 p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            className={`w-full rounded-md p-3 text-sm focus:ring-2 focus:outline-none ${
+              paymentFormSubmitted && notesError && typeof notesError === 'string' && notesError.trim().length > 0 ? '!border-2 !border-red-500 focus:ring-red-500' : 'border border-slate-300 focus:ring-blue-500'
+            }`}
             rows={4}
-            placeholder="Thank you for your business..." />
+            placeholder="Thank you for your business..."
+            value={notes}
+            onChange={(e) => {
+              setNotes(e.target.value);
+              if (paymentFormSubmitted) {
+                setNotesError(validateNotes(e.target.value));
+              }
+            }} />
 
           </div>
         </CardContent>
@@ -684,7 +883,12 @@ export function BuyerCreateInvoicePage() {
         <div className="flex items-center justify-between pt-6 border-t border-slate-200">
           <Button
             variant="outline"
-            onClick={() => setStep(Math.max(1, step - 1))}
+            onClick={() => {
+              setStep(Math.max(1, step - 1));
+              if (step === 3) {
+                setItemsFormSubmitted(false);
+              }
+            }}
             disabled={step === 1}>
 
             Back
@@ -692,7 +896,22 @@ export function BuyerCreateInvoicePage() {
 
           {step < 3 ?
           <Button
-            onClick={() => setStep(Math.min(3, step + 1))}
+            onClick={() => {
+              if (step === 2) {
+                setItemsFormSubmitted(true);
+                // Check if items are valid before proceeding
+                const isValid = items.every(item =>
+                  item.desc.trim() !== '' &&
+                  Number(item.qty) > 0 &&
+                  Number(item.rate) > 0
+                );
+                if (isValid) {
+                  setStep(Math.min(3, step + 1));
+                }
+              } else {
+                setStep(Math.min(3, step + 1));
+              }
+            }}
             rightIcon={<ArrowRight className="h-4 w-4" />}
             disabled={
               step === 1 && (
@@ -705,7 +924,12 @@ export function BuyerCreateInvoicePage() {
 
           <Button
             onClick={handleSendInvoice}
-            rightIcon={<Send className="h-4 w-4" />}>
+            rightIcon={<Send className="h-4 w-4" />}
+            disabled={
+              (paymentType === 'full' && (!dueDate.trim() || !notes.trim())) ||
+              (paymentType === 'milestone' && (getTotalPercentage() !== 100 || !notes.trim() || !validateMilestoneDueDates())) ||
+              (paymentType === 'split' && (!notes.trim() || !validateMilestoneDueDates()))
+            }>
 
               Send Invoice
             </Button>
@@ -715,19 +939,46 @@ export function BuyerCreateInvoicePage() {
         {/* Add Client Modal */}
         <Modal
           isOpen={isAddClientModalOpen}
-          onClose={() => setIsAddClientModalOpen(false)}
+          onClose={handleAddClientModalClose}
           title="Add New Client">
 
           <form onSubmit={handleAddClient} className="space-y-4">
-            <Input label="Company Name" placeholder="e.g. Acme Corp" required />
+            <Input
+              label="Company Name"
+              placeholder="e.g. Acme Corp"
+              value={newClientCompanyName}
+              onChange={(e) => {
+                setNewClientCompanyName(e.target.value);
+                if (addClientFormSubmitted) {
+                  setNewClientCompanyNameError(validateCompanyName(e.target.value));
+                }
+              }}
+              error={addClientFormSubmitted ? newClientCompanyNameError : ''} />
             <Input
               label="Email"
               type="email"
               placeholder="billing@acme.com"
-              required />
+              value={newClientEmail}
+              onChange={(e) => {
+                setNewClientEmail(e.target.value);
+                if (addClientFormSubmitted) {
+                  setNewClientEmailError(validateEmail(e.target.value));
+                }
+              }}
+              error={addClientFormSubmitted ? newClientEmailError : ''} />
 
-            <Input label="Phone" placeholder="+91" />
-            <Button type="submit" className="w-full">
+            <Input
+              label="Phone"
+              placeholder="+91 98765 43210"
+              value={newClientPhone}
+              onChange={(e) => {
+                setNewClientPhone(e.target.value);
+                if (addClientFormSubmitted) {
+                  setNewClientPhoneError(validatePhone(e.target.value));
+                }
+              }}
+              error={addClientFormSubmitted ? newClientPhoneError : ''} />
+            <Button type="submit" className="w-full" disabled={!isAddClientFormValid()}>
               Add Client
             </Button>
           </form>

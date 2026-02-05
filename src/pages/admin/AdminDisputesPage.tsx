@@ -9,8 +9,28 @@ import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Toast } from '../../components/ui/Toast';
 import { Timeline } from '../../components/shared/Timeline';
+
+interface TimelineItem {
+  id: string;
+  type: string;
+  title: string;
+  date: string;
+  time: string;
+  description?: string;
+}
+
+interface Dispute {
+  id: string;
+  user: string;
+  subject: string;
+  status: string;
+  priority: string;
+  description: string;
+  timeline: TimelineItem[];
+}
+
 export function AdminDisputesPage() {
-  const [selectedDispute, setSelectedDispute] = useState<any>(null);
+  const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [resolveId, setResolveId] = useState<string | null>(null);
   const [showToast, setShowToast] = useState<{
@@ -177,7 +197,7 @@ export function AdminDisputesPage() {
       setTimeout(() => setShowToast(null), 3000);
     }
   };
-  const openDetail = (dispute: any) => {
+  const openDetail = (dispute: Dispute) => {
     setSelectedDispute(dispute);
     setIsDetailModalOpen(true);
   };

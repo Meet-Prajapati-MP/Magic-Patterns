@@ -119,7 +119,7 @@ export function InvoiceDetailPage() {
                     <p className="text-2xl font-bold text-slate-900">
                       ₹{invoiceData.paidAmount.toLocaleString()}{' '}
                       <span className="text-sm text-slate-400 font-normal">
-                        of ₹{invoiceData.total.toLocaleString()}
+                        {' '}of ₹{invoiceData.total.toLocaleString()}
                       </span>
                     </p>
                   </div>
@@ -248,8 +248,7 @@ export function InvoiceDetailPage() {
 
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
-              Send a friendly reminder to{' '}
-              <strong>{invoiceData.buyer.name}</strong> about the pending
+              Send a friendly reminder to <strong>{invoiceData.buyer.name}</strong> about the pending
               payment of <strong>₹{invoiceData.total.toLocaleString()}</strong>.
             </p>
             <div>

@@ -646,7 +646,7 @@ export function ProductPage() {
 
 }
 // Helper icon component for file text
-function FileText(props: any) {
+function FileText(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       {...props}

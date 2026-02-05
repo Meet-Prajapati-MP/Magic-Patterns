@@ -101,8 +101,7 @@ export function PaymentFlowPage() {
             </CardHeader>
             <CardContent>
               <p className="text-slate-600 mb-6">
-                To securely process your payment for invoice{' '}
-                <strong>#{invoice.id}</strong>, please verify your phone number.
+                To securely process your payment for invoice <strong>#{invoice.id}</strong>, please verify your phone number.
               </p>
               <form onSubmit={handlePhoneSubmit} className="space-y-6">
                 <div>

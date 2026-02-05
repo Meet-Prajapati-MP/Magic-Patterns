@@ -7,8 +7,18 @@ import { Modal } from '../../components/ui/Modal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Toast } from '../../components/ui/Toast';
 import { Input } from '../../components/ui/Input';
+interface KYCApplication {
+  id: string;
+  name: string;
+  role: string;
+  business: string;
+  submitted: string;
+  status: string;
+  docs: number;
+}
+
 export function KYCReviewPage() {
-  const [selectedApp, setSelectedApp] = useState<any>(null);
+  const [selectedApp, setSelectedApp] = useState<KYCApplication | null>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [actionType, setActionType] = useState<
     'approve' | 'reject' | 'request_info' | null>(
@@ -55,7 +65,7 @@ export function KYCReviewPage() {
     docs: 4
   }]
   );
-  const openReview = (app: any) => {
+  const openReview = (app: KYCApplication) => {
     setSelectedApp(app);
     setIsReviewModalOpen(true);
   };
@@ -154,20 +164,16 @@ export function KYCReviewPage() {
                 </h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-blue-700">Name:</span>{' '}
-                    {selectedApp.name}
+                    <span className="text-blue-700">Name:</span> {selectedApp.name}
                   </div>
                   <div>
-                    <span className="text-blue-700">Role:</span>{' '}
-                    {selectedApp.role}
+                    <span className="text-blue-700">Role:</span> {selectedApp.role}
                   </div>
                   <div>
-                    <span className="text-blue-700">Business:</span>{' '}
-                    {selectedApp.business}
+                    <span className="text-blue-700">Business:</span> {selectedApp.business}
                   </div>
                   <div>
-                    <span className="text-blue-700">Email:</span>{' '}
-                    user@example.com
+                    <span className="text-blue-700">Email:</span> user@example.com
                   </div>
                 </div>
               </div>

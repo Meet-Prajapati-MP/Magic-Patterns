@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -23,6 +23,8 @@ import { DatePicker } from '../../components/ui/DatePicker';
 import { Switch } from '../../components/ui/Switch';
 import { Modal } from '../../components/ui/Modal';
 import { Toast } from '../../components/ui/Toast';
+import { createInvoice } from '../../services/invoiceService';
+import { supabaseClient } from '../../supabase-client';
 export function CreateInvoicePage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -31,6 +33,25 @@ export function CreateInvoicePage() {
     type: 'success' | 'error';
   } | null>(null);
   const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false);
+  // Add Client Form State
+  const [newClientCompanyName, setNewClientCompanyName] = useState('');
+  const [newClientEmail, setNewClientEmail] = useState('');
+  const [newClientPhone, setNewClientPhone] = useState('');
+  // Add Client Validation errors
+  const [newClientCompanyNameError, setNewClientCompanyNameError] = useState('');
+  const [newClientEmailError, setNewClientEmailError] = useState('');
+  const [newClientPhoneError, setNewClientPhoneError] = useState('');
+  // Track if Add Client form has been submitted
+  const [addClientFormSubmitted, setAddClientFormSubmitted] = useState(false);
+  // Track if items form has been submitted (for step 2)
+  const [itemsFormSubmitted, setItemsFormSubmitted] = useState(false);
+  // Payment section state
+  const [dueDate, setDueDate] = useState('');
+  const [notes, setNotes] = useState('');
+  const [dueDateError, setDueDateError] = useState('');
+  const [notesError, setNotesError] = useState('');
+  // Track if payment form has been submitted
+  const [paymentFormSubmitted, setPaymentFormSubmitted] = useState(false);
   // Form State
   const [selectedClient, setSelectedClient] = useState('');
   const [clientEmail, setClientEmail] = useState('');
@@ -121,7 +142,7 @@ export function CreateInvoicePage() {
       setMilestones(milestones.filter((m) => m.id !== id));
     }
   };
-  const updateMilestone = (id: number, field: string, value: any) => {
+  const updateMilestone = (id: number, field: string, value: string | number) => {
     setMilestones(
       milestones.map((m) =>
       m.id === id ?
@@ -133,8 +154,40 @@ export function CreateInvoicePage() {
       )
     );
   };
+
+  // Ensure split payment always has 2 fixed payments at 50% each
+  useEffect(() => {
+    if (paymentType === 'split') {
+      setMilestones((prevMilestones) => [
+        {
+          id: 1,
+          description: 'Payment 1',
+          percentage: 50,
+          dueDate: prevMilestones[0]?.dueDate || ''
+        },
+        {
+          id: 2,
+          description: 'Payment 2',
+          percentage: 50,
+          dueDate: prevMilestones[1]?.dueDate || ''
+        }
+      ]);
+    }
+  }, [paymentType]);
+
   const getTotalPercentage = () => {
-    return milestones.reduce((acc, m) => acc + (m.percentage || 0), 0);
+    return milestones.reduce((acc, m) => acc + (Number(m.percentage) || 0), 0);
+  };
+
+  const getMilestonePercentageError = (milestoneId: number): string => {
+    if (!paymentFormSubmitted) {
+      return '';
+    }
+    const total = getTotalPercentage();
+    if (total !== 100) {
+      return `Total must equal 100% (Current: ${total}%)`;
+    }
+    return '';
   };
   const handleSaveDraft = () => {
     setShowToast({
@@ -143,14 +196,174 @@ export function CreateInvoicePage() {
     });
     setTimeout(() => setShowToast(null), 3000);
   };
-  const handleSendInvoice = () => {
-    setShowToast({
-      message: 'Invoice sent successfully!',
-      type: 'success'
-    });
-    setTimeout(() => {
-      navigate('/seller/invoices');
-    }, 1500);
+  const validateDueDate = (dateValue: string): string => {
+    if (!dateValue.trim()) {
+      return 'Due date is required';
+    }
+    return '';
+  };
+
+  const validateNotes = (notesValue: string): string => {
+    if (!notesValue.trim()) {
+      return 'Notes is required';
+    }
+    return '';
+  };
+
+  const validateMilestoneDueDates = (): boolean => {
+    if (paymentType === 'milestone' || paymentType === 'split') {
+      return milestones.every(m => m.dueDate.trim() !== '');
+    }
+    return true;
+  };
+
+  const handleSendInvoice = async () => {
+    setPaymentFormSubmitted(true);
+    
+    // Validate payment fields when payment type is 'full'
+    if (paymentType === 'full') {
+      const dateErr = validateDueDate(dueDate);
+      const notesErr = validateNotes(notes);
+      
+      setDueDateError(dateErr);
+      setNotesError(notesErr);
+      
+      if (dateErr || notesErr) {
+        return;
+      }
+    }
+    
+    // Validate milestone/split payment due dates
+    if (paymentType === 'milestone' || paymentType === 'split') {
+      const notesErr = validateNotes(notes);
+      setNotesError(notesErr);
+      
+      if (!validateMilestoneDueDates() || notesErr) {
+        return;
+      }
+    } else {
+      // For milestone/split, only validate notes
+      const notesErr = validateNotes(notes);
+      setNotesError(notesErr);
+      
+      if (notesErr) {
+        return;
+      }
+    }
+
+    // Get client name from selected client or use a default
+    const clientName = selectedClient 
+      ? clients.find(c => c.value === selectedClient)?.label || 'Client'
+      : 'Client';
+
+    // Prepare invoice items
+    const invoiceItems = items.map(item => ({
+      description: item.desc,
+      quantity: item.qty,
+      rate: item.rate,
+      amount: item.qty * item.rate
+    }));
+
+    // Prepare milestones if applicable
+    let invoiceMilestones;
+    if (paymentType === 'milestone' || paymentType === 'split') {
+      const totalAmount = calculateTotal();
+      invoiceMilestones = milestones.map(milestone => ({
+        description: milestone.description,
+        percentage: milestone.percentage,
+        dueDate: milestone.dueDate,
+        amount: (totalAmount * milestone.percentage) / 100
+      }));
+    }
+
+    // Get current user - try auth first, then use placeholder for development
+    let userId: string | null = null;
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    
+    if (user && !userError) {
+      userId = user.id;
+      console.log('Using authenticated user:', userId);
+    } else {
+      // For development: Use a placeholder UUID if RLS is disabled
+      // This allows testing without authentication
+      console.warn('No authenticated user found. Using placeholder user ID for development.');
+      console.warn('NOTE: RLS must be disabled in Supabase for this to work.');
+      
+      // Generate a consistent placeholder UUID based on phone number
+      // This ensures the same user gets the same ID
+      const storedUserData = localStorage.getItem('userData');
+      if (storedUserData) {
+        try {
+          const userData = JSON.parse(storedUserData);
+          // Create a deterministic UUID from phone number
+          // This is only for development when RLS is disabled
+          const phoneHash = userData.phone || 'default';
+          // Simple hash to create consistent UUID-like string
+          userId = '00000000-0000-0000-0000-' + phoneHash.padStart(12, '0').slice(-12);
+          console.log('Using placeholder user ID:', userId);
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+          userId = '00000000-0000-0000-0000-000000000001'; // Fallback placeholder
+        }
+      } else {
+        userId = '00000000-0000-0000-0000-000000000001'; // Fallback placeholder
+      }
+      
+      console.warn('⚠️ Development mode: Using placeholder user ID. Ensure RLS is disabled in Supabase.');
+    }
+
+    // Prepare invoice data
+    const invoiceData = {
+      clientId: selectedClient || undefined,
+      clientName: clientName,
+      clientEmail: clientEmail,
+      clientAddress: clientAddress || undefined,
+      clientGstin: clientGstin || undefined,
+      invoiceDate: new Date().toISOString().split('T')[0], // Today's date
+      dueDate: paymentType === 'full' ? dueDate : undefined,
+      paymentType: paymentType as 'full' | 'milestone' | 'split',
+      subtotal: calculateSubtotal(),
+      taxRate: taxEnabled ? 18 : 0,
+      taxAmount: calculateTax(),
+      totalAmount: calculateTotal(),
+      items: invoiceItems,
+      milestones: invoiceMilestones,
+      notes: notes || undefined,
+      status: 'sent' as const,
+      isDraft: false
+    };
+
+    console.log('📝 Creating invoice with data:', invoiceData);
+    console.log('👤 User ID:', userId);
+    console.log('🔐 Auth check:', await supabaseClient.auth.getUser());
+
+    // Save invoice to Supabase
+    const result = await createInvoice(invoiceData, userId!);
+
+    console.log('✅ Invoice creation result:', result);
+    
+    if (!result.success) {
+      console.error('❌ INVOICE CREATION FAILED!');
+      console.error('Error:', result.error);
+      console.error('User ID used:', userId);
+      console.error('Auth session:', await supabaseClient.auth.getSession());
+    }
+
+    if (result.success) {
+      setShowToast({
+        message: 'Invoice sent successfully!',
+        type: 'success'
+      });
+      setTimeout(() => {
+        navigate('/seller/invoices');
+      }, 1500);
+    } else {
+      console.error('Invoice creation failed:', result.error);
+      setShowToast({
+        message: result.error || 'Failed to save invoice. Please check console for details.',
+        type: 'error'
+      });
+    }
   };
   const isFormValid = () => {
   return items.every(item => 
@@ -159,12 +372,69 @@ export function CreateInvoicePage() {
     item.rate > 0
   );
 };
+  // Validation functions for Add Client
+  const validateEmail = (emailValue: string): string => {
+    if (!emailValue.trim()) {
+      return 'Email is required';
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailValue)) {
+      return 'Please enter a valid email address';
+    }
+    return '';
+  };
+
+  const validatePhone = (phoneValue: string): string => {
+    if (!phoneValue.trim()) {
+      return 'Phone number is required';
+    }
+    // Remove all non-digit characters and check for exactly 10 digits
+    const digitsOnly = phoneValue.replace(/\D/g, '');
+    if (digitsOnly.length !== 10) {
+      return 'Phone number must be exactly 10 digits';
+    }
+    return '';
+  };
+
+  const validateCompanyName = (name: string): string => {
+    if (!name.trim()) {
+      return 'Company name is required';
+    }
+    return '';
+  };
+
+  const isAddClientFormValid = (): boolean => {
+    return (
+      newClientCompanyName.trim() !== '' &&
+      newClientEmail.trim() !== '' &&
+      newClientPhone.trim() !== '' &&
+      newClientCompanyNameError === '' &&
+      newClientEmailError === '' &&
+      newClientPhoneError === ''
+    );
+  };
+
   const handleAddClient = (e: React.FormEvent) => {
     e.preventDefault();
+    setAddClientFormSubmitted(true);
+    
+    // Validate all fields
+    const nameErr = validateCompanyName(newClientCompanyName);
+    const emailErr = validateEmail(newClientEmail);
+    const phoneErr = validatePhone(newClientPhone);
+
+    setNewClientCompanyNameError(nameErr);
+    setNewClientEmailError(emailErr);
+    setNewClientPhoneError(phoneErr);
+
+    if (nameErr || emailErr || phoneErr) {
+      return;
+    }
+
     // In real app, get values from form
     const newClient = {
       value: Date.now().toString(),
-      label: 'New Client Company'
+      label: newClientCompanyName
     };
     setClients([...clients, newClient]);
     setSelectedClient(newClient.value);
@@ -174,6 +444,27 @@ export function CreateInvoicePage() {
       type: 'success'
     });
     setTimeout(() => setShowToast(null), 3000);
+
+    // Reset form
+    setNewClientCompanyName('');
+    setNewClientEmail('');
+    setNewClientPhone('');
+    setNewClientCompanyNameError('');
+    setNewClientEmailError('');
+    setNewClientPhoneError('');
+    setAddClientFormSubmitted(false);
+  };
+
+  const handleAddClientModalClose = () => {
+    setIsAddClientModalOpen(false);
+    // Reset form on close
+    setNewClientCompanyName('');
+    setNewClientEmail('');
+    setNewClientPhone('');
+    setNewClientCompanyNameError('');
+    setNewClientEmailError('');
+    setNewClientPhoneError('');
+    setAddClientFormSubmitted(false);
   };
   const renderStep1 = () =>
   <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -313,7 +604,7 @@ export function CreateInvoicePage() {
                   newItems[index].desc = e.target.value;
                   setItems(newItems);
                 }}
-                error={item.desc.trim()==='' ? 'Description is required' : ''}
+                error={itemsFormSubmitted && item.desc.trim() === '' ? 'Description is required' : ''}
                  />
 
                 </div>
@@ -327,7 +618,7 @@ export function CreateInvoicePage() {
                   newItems[index].qty = parseInt(e.target.value) || 0;
                   setItems(newItems);
                 }}
-                error={item.qty <= 0 ? 'Quantity must be greater than 0' : ''} />
+                error={itemsFormSubmitted && Number(item.qty) <= 0 ? 'Quantity must be greater than 0' : ''} />
 
                 </div>
                 <div className="w-32">
@@ -340,7 +631,7 @@ export function CreateInvoicePage() {
                   newItems[index].rate = parseFloat(e.target.value) || 0;
                   setItems(newItems);
                 }} 
-                error={item.rate <= 0 ? 'Rate must be greater than 0' : ''}/>
+                error={itemsFormSubmitted && Number(item.rate) <= 0 ? 'Rate must be greater than 0' : ''}/>
 
                 </div>
                 <div className="w-32 pb-2 text-right font-medium text-slate-900">
@@ -465,7 +756,16 @@ export function CreateInvoicePage() {
 
           {paymentType === 'full' &&
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <DatePicker label="Due Date" />
+              <DatePicker
+                label="Due Date"
+                value={dueDate}
+                onChange={(e) => {
+                  setDueDate(e.target.value);
+                  if (paymentFormSubmitted) {
+                    setDueDateError(validateDueDate(e.target.value));
+                  }
+                }}
+                error={paymentFormSubmitted ? dueDateError : ''} />
             </div>
         }
 
@@ -525,33 +825,31 @@ export function CreateInvoicePage() {
                   label="Percentage (%)"
                   type="number"
                   placeholder="50"
-                  value={milestone.percentage}
+                  value={paymentType === 'split' ? 50 : milestone.percentage}
+                  onChange={(e) => {
+                    if (paymentType !== 'split') {
+                      updateMilestone(
+                        milestone.id,
+                        'percentage',
+                        parseInt(e.target.value) || 0
+                      );
+                    }
+                  }}
+                  error={paymentType === 'milestone' ? getMilestonePercentageError(milestone.id) : ''}
+                  disabled={paymentType === 'split'}
+                  readOnly={paymentType === 'split'} />
+
+                      <DatePicker
+                  label="Due Date"
+                  value={milestone.dueDate}
                   onChange={(e) =>
                   updateMilestone(
                     milestone.id,
-                    'percentage',
-                    parseInt(e.target.value) || 0
+                    'dueDate',
+                    e.target.value
                   )
                   }
-                  disabled={paymentType === 'split'} />
-
-                      <div className="space-y-1.5">
-                        <label className="block text-sm font-medium text-slate-700">
-                          Due Date
-                        </label>
-                        <input
-                    type="date"
-                    className="w-full rounded-md border border-slate-300 p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    value={milestone.dueDate}
-                    onChange={(e) =>
-                    updateMilestone(
-                      milestone.id,
-                      'dueDate',
-                      e.target.value
-                    )
-                    } />
-
-                      </div>
+                  error={paymentFormSubmitted && !milestone.dueDate.trim() ? 'Due date is required' : ''} />
                     </div>
 
                     <div className="text-sm text-slate-600">
@@ -567,8 +865,7 @@ export function CreateInvoicePage() {
 
               {getTotalPercentage() !== 100 &&
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-                  Total percentage must equal 100%. Currently:{' '}
-                  {getTotalPercentage()}%
+                  Total percentage must equal 100%. Currently: {getTotalPercentage()}%
                 </div>
           }
             </div>
@@ -590,13 +887,27 @@ export function CreateInvoicePage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Notes / Terms
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-slate-700">
+                Notes / Terms
+              </label>
+              {paymentFormSubmitted && notesError &&
+              <span className="text-xs text-red-500 font-medium ml-2">{notesError}</span>
+              }
+            </div>
             <textarea
-            className="w-full rounded-md border border-slate-300 p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            className={`w-full rounded-md p-3 text-sm focus:ring-2 focus:outline-none ${
+              paymentFormSubmitted && notesError && typeof notesError === 'string' && notesError.trim().length > 0 ? '!border-2 !border-red-500 focus:ring-red-500' : 'border border-slate-300 focus:ring-blue-500'
+            }`}
             rows={4}
-            placeholder="Thank you for your business..." />
+            placeholder="Thank you for your business..."
+            value={notes}
+            onChange={(e) => {
+              setNotes(e.target.value);
+              if (paymentFormSubmitted) {
+                setNotesError(validateNotes(e.target.value));
+              }
+            }} />
 
           </div>
         </CardContent>
@@ -669,7 +980,12 @@ export function CreateInvoicePage() {
         <div className="flex items-center justify-between pt-6 border-t border-slate-200">
           <Button
             variant="outline"
-            onClick={() => setStep(Math.max(1, step - 1))}
+            onClick={() => {
+              setStep(Math.max(1, step - 1));
+              if (step === 3) {
+                setItemsFormSubmitted(false);
+              }
+            }}
             disabled={step === 1}>
 
             Back
@@ -677,31 +993,44 @@ export function CreateInvoicePage() {
 
           {step < 3 ?
           <Button
-  onClick={() => setStep(Math.min(3, step + 1))}
+  onClick={() => {
+    if (step === 2) {
+      setItemsFormSubmitted(true);
+      // Check if items are valid before proceeding
+      const isValid = items.every(item => 
+        item.desc.trim() !== '' && 
+        Number(item.qty) > 0 && 
+        Number(item.rate) > 0
+      );
+      if (isValid) {
+        setStep(Math.min(3, step + 1));
+      }
+    } else {
+      setStep(Math.min(3, step + 1));
+    }
+  }}
   rightIcon={<ArrowRight className="h-4 w-4" />}
   disabled={
-    (step === 1 && (
+    step === 1 && (
       !selectedClient || 
       clientEmailError || 
       clientGstinError || 
       clientAddressError || 
       (selectedClient && !clientEmail) || 
       (selectedClient && !clientAddress)
-    )) ||
-    (step === 2 && ( 
-      !items.every(item => 
-        item.desc.trim() !== '' && 
-        item.qty <= 0 && 
-        item.rate <= 0
-      )
-    ))
+    )
   }>
   Next Step
 </Button> :
 
           <Button
             onClick={handleSendInvoice}
-            rightIcon={<Send className="h-4 w-4" />}>
+            rightIcon={<Send className="h-4 w-4" />}
+            disabled={
+              (paymentType === 'full' && (!dueDate.trim() || !notes.trim())) ||
+              (paymentType === 'milestone' && (getTotalPercentage() !== 100 || !notes.trim() || !validateMilestoneDueDates())) ||
+              (paymentType === 'split' && (!notes.trim() || !validateMilestoneDueDates()))
+            }>
 
               Send Invoice
             </Button>
@@ -711,19 +1040,46 @@ export function CreateInvoicePage() {
         {/* Add Client Modal */}
         <Modal
           isOpen={isAddClientModalOpen}
-          onClose={() => setIsAddClientModalOpen(false)}
+          onClose={handleAddClientModalClose}
           title="Add New Client">
 
           <form onSubmit={handleAddClient} className="space-y-4">
-            <Input label="Company Name" placeholder="e.g. Acme Corp" required />
+            <Input
+              label="Company Name"
+              placeholder="e.g. Acme Corp"
+              value={newClientCompanyName}
+              onChange={(e) => {
+                setNewClientCompanyName(e.target.value);
+                if (addClientFormSubmitted) {
+                  setNewClientCompanyNameError(validateCompanyName(e.target.value));
+                }
+              }}
+              error={addClientFormSubmitted ? newClientCompanyNameError : ''} />
             <Input
               label="Email"
               type="email"
               placeholder="billing@acme.com"
-              required />
+              value={newClientEmail}
+              onChange={(e) => {
+                setNewClientEmail(e.target.value);
+                if (addClientFormSubmitted) {
+                  setNewClientEmailError(validateEmail(e.target.value));
+                }
+              }}
+              error={addClientFormSubmitted ? newClientEmailError : ''} />
 
-            <Input label="Phone" placeholder="+91" />
-            <Button type="submit" className="w-full">
+            <Input
+              label="Phone"
+              placeholder="+91 98765 43210"
+              value={newClientPhone}
+              onChange={(e) => {
+                setNewClientPhone(e.target.value);
+                if (addClientFormSubmitted) {
+                  setNewClientPhoneError(validatePhone(e.target.value));
+                }
+              }}
+              error={addClientFormSubmitted ? newClientPhoneError : ''} />
+            <Button type="submit" className="w-full" disabled={!isAddClientFormValid()}>
               Add Client
             </Button>
           </form>

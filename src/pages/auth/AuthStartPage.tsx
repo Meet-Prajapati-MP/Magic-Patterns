@@ -1,29 +1,88 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Shield, Phone } from 'lucide-react';
+import { ArrowRight, Shield, Phone, User } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 export function AuthStartPage() {
   const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [nameError, setNameError] = useState('');
   const [phone, setPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const handleSubmit = (e: React.FormEvent) => {
+  const [formSubmitted, setFormSubmitted] = useState(false);
+  
+  const validateName = (nameValue: string): string => {
+    if (!nameValue.trim()) {
+      return 'Name is required';
+    }
+    return '';
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (phone.length < 10) return;
+    setFormSubmitted(true);
+    
+    const nameErr = validateName(name);
+    setNameError(nameErr);
+    
+    if (nameErr || phone.length < 10) return;
+    
     setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+    
+    try {
+      // OTP VERIFICATION COMMENTED OUT - Direct navigation for now
+      // // Import OTP service
+      // const { sendOTP, validatePhoneNumber } = await import('../../services/otpService');
+      // 
+      // // Validate phone
+      // const validation = validatePhoneNumber(phone);
+      // if (!validation.valid) {
+      //   setIsLoading(false);
+      //   return;
+      // }
+      // 
+      // // Send OTP
+      // const result = await sendOTP(phone, {
+      //   channel: 'sms',
+      //   name: name.trim()
+      // });
+      // 
+      // if (result.success) {
+      //   navigate(`/auth/verify?mobile=${phone}&name=${encodeURIComponent(name.trim())}`);
+      // } else {
+      //   setIsLoading(false);
+      //   // You can add error handling here if needed
+      // }
+
+      // Direct navigation without OTP verification
+      // Navigate to welcome or dashboard
+      navigate('/');
+    } catch (error) {
+      console.error('Error during login:', error);
       setIsLoading(false);
-      navigate('/auth/verify');
-    }, 1000);
+    }
   };
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <Link to="/" className="flex items-center space-x-2">
-            <div className="h-10 w-10 bg-blue-600 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-xl">T</span>
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center overflow-hidden">
+              <img 
+                src="/logo.png" 
+                alt="Trustopay Logo" 
+                className="h-full w-full object-contain"
+                onError={(e) => {
+                  // Fallback to blue background with T if image fails to load
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent) {
+                    parent.className = 'h-10 w-10 bg-blue-600 rounded-xl flex items-center justify-center';
+                    parent.innerHTML = '<span class="text-white font-bold text-xl">T</span>';
+                  }
+                }}
+              />
             </div>
             <span className="text-2xl font-bold text-slate-900">Trustopay</span>
           </Link>
@@ -39,6 +98,40 @@ export function AuthStartPage() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label
+                  htmlFor="name"
+                  className="block text-sm font-medium text-slate-700">
+                  Name
+                </label>
+                {formSubmitted && nameError && (
+                  <span className="text-xs text-red-500 font-medium ml-2">{nameError}</span>
+                )}
+              </div>
+              <div className="relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User className="h-4 w-4 text-slate-400" />
+                </div>
+                <input
+                  type="text"
+                  name="name"
+                  id="name"
+                  className={`block w-full pl-10 pr-3 py-2 rounded-md focus:ring-2 focus:outline-none sm:text-sm ${
+                    formSubmitted && nameError ? 'border-2 border-red-500 focus:ring-red-500' : 'border border-slate-300 focus:ring-blue-500 focus:border-blue-500'
+                  }`}
+                  placeholder="Enter your name"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (formSubmitted) {
+                      setNameError(validateName(e.target.value));
+                    }
+                  }}
+                  required />
+              </div>
+            </div>
+
             <div>
               <label
                 htmlFor="phone"
@@ -80,15 +173,11 @@ export function AuthStartPage() {
                 htmlFor="terms"
                 className="ml-2 block text-sm text-slate-900">
 
-                I agree to the{' '}
-                <Link to="/terms" className="text-blue-600 hover:text-blue-500">
+                I agree to the <Link to="/terms" className="text-blue-600 hover:text-blue-500">
                   Terms
-                </Link>{' '}
-                and{' '}
-                <Link
+                </Link> and <Link
                   to="/privacy"
                   className="text-blue-600 hover:text-blue-500">
-
                   Privacy Policy
                 </Link>
               </label>
@@ -99,6 +188,7 @@ export function AuthStartPage() {
               className="w-full"
               size="lg"
               isLoading={isLoading}
+              disabled={!name.trim() || phone.length < 10}
               rightIcon={<ArrowRight className="h-4 w-4" />}>
 
               Continue
@@ -127,7 +217,7 @@ export function AuthStartPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-slate-500">
-          Having trouble?{' '}
+          Having trouble? 
           <Link
             to="/contact"
             className="font-medium text-blue-600 hover:text-blue-500">

@@ -8,8 +8,18 @@ import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Toast } from '../../components/ui/Toast';
+interface Subscription {
+  id: string;
+  seller: string;
+  plan: string;
+  status: string;
+  renewal: string;
+  amount: string;
+  billing: string;
+}
+
 export function AdminSubscriptionsPage() {
-  const [selectedSub, setSelectedSub] = useState<any>(null);
+  const [selectedSub, setSelectedSub] = useState<Subscription | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [showToast, setShowToast] = useState<{
@@ -121,7 +131,7 @@ export function AdminSubscriptionsPage() {
       setTimeout(() => setShowToast(null), 3000);
     }
   };
-  const openDetail = (sub: any) => {
+  const openDetail = (sub: Subscription) => {
     setSelectedSub(sub);
     setIsDetailModalOpen(true);
   };

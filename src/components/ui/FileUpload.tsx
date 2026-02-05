@@ -100,8 +100,7 @@ export function FileUpload({
             Click to upload or drag and drop
           </p>
           <p className="text-xs text-slate-500">
-            {accept === '*' ? 'Any file' : accept.replace(/,/g, ', ')} (max{' '}
-            {maxSize / 1024 / 1024}MB)
+            {accept === '*' ? 'Any file' : accept.replace(/,/g, ', ')} (max {maxSize / 1024 / 1024}MB)
           </p>
         </div>
       </div>

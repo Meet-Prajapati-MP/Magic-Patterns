@@ -27,8 +27,7 @@ export function AdminPartnersPage() {
               <div className="space-y-2 text-sm text-slate-500">
                 <p>Contact: Vikram Singh</p>
                 <p>
-                  API Status:{' '}
-                  <span className="text-green-600 font-medium">Connected</span>
+                  API Status: <span className="text-green-600 font-medium">Connected</span>
                 </p>
                 <p>Active Since: Jan 2024</p>
               </div>

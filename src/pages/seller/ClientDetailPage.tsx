@@ -86,7 +86,7 @@ export function ClientDetailPage() {
           <div className="flex space-x-2">
             <Button variant="outline">Edit Details</Button>
             <Link to="/seller/invoices/create">
-              <Button leftIcon={<Plus className="h-4 w-4" />}>
+              <Button variant="outline" className="bg-white text-blue-700 border-[#DBEAFE] hover:bg-[#F0F9FF]" leftIcon={<Plus className="h-4 w-4" />}>
                 Create Invoice
               </Button>
             </Link>

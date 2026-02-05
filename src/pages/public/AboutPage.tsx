@@ -19,8 +19,7 @@ export function AboutPage() {
       <section className="pt-24 pb-20 bg-white text-center">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-4xl md:text-6xl font-bold text-slate-900 mb-6">
-            Empowering India's{' '}
-            <span className="text-blue-600">Freelance Economy</span>
+            Empowering India's <span className="text-blue-600">Freelance Economy</span>
           </h1>
           <p className="text-xl text-slate-600 max-w-3xl mx-auto">
             We're on a mission to solve the payment problem for India's 15
@@ -39,8 +38,7 @@ export function AboutPage() {
               </h2>
               <div className="prose prose-lg text-slate-600">
                 <p className="mb-4">
-                  Trustpay was born in 2024 from a simple frustration:{' '}
-                  <strong>
+                  Trustpay was born in 2024 from a simple frustration: <strong>
                     getting paid shouldn't be harder than doing the work.
                   </strong>
                 </p>
@@ -302,12 +300,10 @@ export function AboutPage() {
           </Link>
           <div className="mt-8 flex justify-center gap-6 text-sm text-slate-500">
             <span className="flex items-center">
-              <CheckCircle className="h-4 w-4 mr-2 text-green-500" />{' '}
-              Remote-first
+              <CheckCircle className="h-4 w-4 mr-2 text-green-500" /> Remote-first
             </span>
             <span className="flex items-center">
-              <CheckCircle className="h-4 w-4 mr-2 text-green-500" />{' '}
-              Competitive equity
+              <CheckCircle className="h-4 w-4 mr-2 text-green-500" /> Competitive equity
             </span>
             <span className="flex items-center">
               <CheckCircle className="h-4 w-4 mr-2 text-green-500" /> Health

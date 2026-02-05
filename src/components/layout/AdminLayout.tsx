@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -14,12 +14,28 @@ import {
   X,
   LogOut } from
 'lucide-react';
+import { getCurrentUserProfile, getUserInitials } from '../../services/profileService';
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
 export function AdminLayout({ children }: AdminLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [userName, setUserName] = useState('Admin User');
+  const [userInitials, setUserInitials] = useState('AD');
   const location = useLocation();
+
+  // Fetch user profile on mount
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      const { data: profile, error } = await getCurrentUserProfile();
+      if (profile && !error) {
+        const name = profile.name || 'Admin User';
+        setUserName(name);
+        setUserInitials(getUserInitials(name));
+      }
+    };
+    fetchUserProfile();
+  }, []);
   const navigation = [
   {
     name: 'Dashboard',
@@ -73,8 +89,22 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-64 bg-slate-900 text-white fixed inset-y-0 z-50">
         <div className="p-6 border-b border-slate-800 flex items-center space-x-2">
-          <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-lg">T</span>
+          <div className="h-8 w-8 rounded-lg flex items-center justify-center overflow-hidden">
+            <img 
+              src="/logo.png" 
+              alt="Trustopay Logo" 
+              className="h-full w-full object-contain"
+              onError={(e) => {
+                // Fallback to blue background with T if image fails to load
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const parent = target.parentElement;
+                if (parent) {
+                  parent.className = 'h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center';
+                  parent.innerHTML = '<span class="text-white font-bold text-lg">T</span>';
+                }
+              }}
+            />
           </div>
           <span className="text-xl font-bold">Trustopay Admin</span>
         </div>
@@ -95,11 +125,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         <div className="p-4 border-t border-slate-800">
           <div className="flex items-center p-3 rounded-lg bg-slate-800">
             <div className="h-10 w-10 rounded-full bg-blue-900 flex items-center justify-center text-blue-200 font-semibold">
-              AD
+              {userInitials}
             </div>
             <div className="ml-3 flex-1 min-w-0">
               <p className="text-sm font-medium text-white truncate">
-                Admin User
+                {userName}
               </p>
               <p className="text-xs text-slate-400 truncate">Super Admin</p>
             </div>
@@ -113,8 +143,22 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-slate-900 text-white px-4 h-16 flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-lg">T</span>
+          <div className="h-8 w-8 rounded-lg flex items-center justify-center overflow-hidden">
+            <img 
+              src="/logo.png" 
+              alt="Trustopay Logo" 
+              className="h-full w-full object-contain"
+              onError={(e) => {
+                // Fallback to blue background with T if image fails to load
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const parent = target.parentElement;
+                if (parent) {
+                  parent.className = 'h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center';
+                  parent.innerHTML = '<span class="text-white font-bold text-lg">T</span>';
+                }
+              }}
+            />
           </div>
           <span className="text-lg font-bold">Trustopay Admin</span>
         </div>

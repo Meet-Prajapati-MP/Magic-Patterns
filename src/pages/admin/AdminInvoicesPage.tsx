@@ -8,8 +8,18 @@ import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Toast } from '../../components/ui/Toast';
+interface Invoice {
+  id: string;
+  seller: string;
+  buyer: string;
+  amount: string;
+  status: string;
+  flagged: boolean;
+  date: string;
+}
+
 export function AdminInvoicesPage() {
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [voidId, setVoidId] = useState<string | null>(null);
   const [showToast, setShowToast] = useState<{
@@ -139,7 +149,7 @@ export function AdminInvoicesPage() {
       setTimeout(() => setShowToast(null), 3000);
     }
   };
-  const openDetail = (inv: any) => {
+  const openDetail = (inv: Invoice) => {
     setSelectedInvoice(inv);
     setIsDetailModalOpen(true);
   };

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Search,
   Filter,
@@ -18,6 +18,8 @@ import { Dropdown } from '../../components/ui/Dropdown';
 import { Modal } from '../../components/ui/Modal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Toast } from '../../components/ui/Toast';
+import { getBuyerInvoices, formatAmount, formatDate } from '../../services/invoiceService';
+import { supabaseClient } from '../../supabase-client';
 export function BuyerInvoicesPage() {
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,57 +52,77 @@ export function BuyerInvoicesPage() {
     label: 'Disputed'
   }];
 
-  // Mock Data
-  const [invoices, setInvoices] = useState([
-  {
-    id: 'INV-007',
-    seller: 'Rajesh Design Studio',
-    date: '20 Jan 2024',
-    due: 'Tomorrow',
-    amount: '₹29,550',
-    status: 'pending'
-  },
-  {
-    id: 'INV-008',
-    seller: 'TechCraft Solutions',
-    date: '15 Jan 2024',
-    due: 'In 3 days',
-    amount: '₹60,000',
-    status: 'pending'
-  },
-  {
-    id: 'INV-003',
-    seller: 'Priya Design',
-    date: '01 Jan 2024',
-    due: 'Yesterday',
-    amount: '₹25,000',
-    status: 'overdue'
-  },
-  {
-    id: 'INV-009',
-    seller: 'Global Services',
-    date: '10 Jan 2024',
-    due: '25 Jan 2024',
-    amount: '₹25,000',
-    status: 'paid'
-  },
-  {
-    id: 'INV-010',
-    seller: 'Acme Corp',
-    date: '05 Jan 2024',
-    due: '12 Jan 2024',
-    amount: '₹12,000',
-    status: 'paid'
-  },
-  {
-    id: 'INV-011',
-    seller: 'Beta Corp',
-    date: '02 Jan 2024',
-    due: '09 Jan 2024',
-    amount: '₹5,000',
-    status: 'disputed'
-  }]
-  );
+  // Invoice data from Supabase
+  const [invoices, setInvoices] = useState<Array<{
+    id: string;
+    seller: string;
+    date: string;
+    due: string;
+    amount: string;
+    status: string;
+  }>>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch invoices from Supabase
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      setIsLoading(true);
+      
+      // For buyer invoices, we need to get invoices where buyer_id matches
+      // Since we're bypassing auth, we'll get all invoices for now
+      // In production, this should filter by buyer_id
+      const { data, error } = await getBuyerInvoices();
+      
+      if (error) {
+        console.error('❌ Error fetching invoices:', error);
+        setShowToast({
+          message: `Failed to load invoices: ${error}`,
+          type: 'error'
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('✅ Fetched buyer invoices:', data?.length || 0, 'invoices');
+
+      if (data && data.length > 0) {
+        // Get seller names from profiles
+        const sellerIds = [...new Set(data.map(inv => inv.seller_id))];
+        const { data: profiles } = await supabaseClient
+          .from('profiles')
+          .select('id, name, business_name')
+          .in('id', sellerIds);
+
+        const sellerMap = new Map();
+        profiles?.forEach(profile => {
+          sellerMap.set(profile.id, profile.business_name || profile.name || 'Seller');
+        });
+
+        // Transform Supabase data to UI format
+        const transformedInvoices = data.map(invoice => {
+          const sellerName = sellerMap.get(invoice.seller_id) || 'Seller';
+          const dueDate = invoice.due_date ? formatDate(invoice.due_date) : '-';
+          
+          return {
+            id: invoice.invoice_number,
+            seller: sellerName,
+            date: formatDate(invoice.invoice_date),
+            due: dueDate,
+            amount: formatAmount(invoice.total_amount),
+            status: invoice.status === 'pending' ? 'pending' : 
+                   invoice.status === 'paid' ? 'paid' :
+                   invoice.status === 'overdue' ? 'overdue' :
+                   invoice.status === 'disputed' ? 'disputed' : 'pending'
+          };
+        });
+        setInvoices(transformedInvoices);
+      }
+      
+      setIsLoading(false);
+    };
+
+    fetchInvoices();
+  }, []);
   const filteredInvoices = useMemo(() => {
     return invoices.filter((invoice) => {
       if (activeTab !== 'all' && invoice.status !== activeTab) return false;
@@ -114,6 +136,8 @@ export function BuyerInvoicesPage() {
       return true;
     });
   }, [invoices, activeTab, searchQuery]);
+  
+  // Add loading state display in the component
   const handleDiscard = () => {
     if (discardId) {
       setInvoices(invoices.filter((inv) => inv.id !== discardId));
@@ -168,7 +192,7 @@ export function BuyerInvoicesPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h2 className="text-2xl font-bold text-slate-900">My Invoices</h2>
           <Link to="/buyer/create-invoice">
-            <Button>Create Invoice</Button>
+            <Button variant="outline" className="bg-white text-blue-700 border-[#DBEAFE] hover:bg-[#F0F9FF]">Create Invoice</Button>
           </Link>
         </div>
 
@@ -246,7 +270,20 @@ export function BuyerInvoicesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {filteredInvoices.map((invoice) =>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-500">
+                      Loading invoices...
+                    </td>
+                  </tr>
+                ) : filteredInvoices.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-500">
+                      No invoices found matching your criteria.
+                    </td>
+                  </tr>
+                ) : (
+                filteredInvoices.map((invoice) => (
                 <tr
                   key={invoice.id}
                   className="hover:bg-slate-50 transition-colors">
@@ -321,8 +358,9 @@ export function BuyerInvoicesPage() {
                       }]
                       } />
 
-                    </td>
-                  </tr>
+                      </td>
+                    </tr>
+                ))
                 )}
               </tbody>
             </table>

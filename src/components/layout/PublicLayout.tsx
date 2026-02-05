@@ -14,8 +14,22 @@ export function PublicLayout({ children }: PublicLayoutProps) {
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center space-x-2">
-            <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
-              <span className="text-white font-bold text-lg">T</span>
+            <div className="h-8 w-8 rounded-lg flex items-center justify-center shadow-sm overflow-hidden">
+              <img 
+                src="/logo.png" 
+                alt="Trustopay Logo" 
+                className="h-full w-full object-contain"
+                onError={(e) => {
+                  // Fallback to blue background with T if image fails to load
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent) {
+                    parent.className = 'h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm';
+                    parent.innerHTML = '<span class="text-white font-bold text-lg">T</span>';
+                  }
+                }}
+              />
             </div>
             <span className="text-xl font-bold text-slate-900 tracking-tight">
               Trustpay
@@ -148,8 +162,22 @@ export function PublicLayout({ children }: PublicLayoutProps) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
             <div className="col-span-2 md:col-span-1">
               <Link to="/" className="flex items-center space-x-2 mb-6">
-                <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">T</span>
+                <div className="h-8 w-8 rounded-lg flex items-center justify-center overflow-hidden">
+                  <img 
+                    src="/logo.png" 
+                    alt="Trustopay Logo" 
+                    className="h-full w-full object-contain"
+                    onError={(e) => {
+                      // Fallback to blue background with T if image fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const parent = target.parentElement;
+                      if (parent) {
+                        parent.className = 'h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center';
+                        parent.innerHTML = '<span class="text-white font-bold text-lg">T</span>';
+                      }
+                    }}
+                  />
                 </div>
                 <span className="text-xl font-bold text-white">Trustpay</span>
               </Link>

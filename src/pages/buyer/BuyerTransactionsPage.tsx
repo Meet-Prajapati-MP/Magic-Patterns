@@ -15,8 +15,18 @@ import { Dropdown } from '../../components/ui/Dropdown';
 import { Modal } from '../../components/ui/Modal';
 import { Toast } from '../../components/ui/Toast';
 import { Timeline } from '../../components/shared/Timeline';
+interface Transaction {
+  id: string;
+  date: string;
+  type: string;
+  amount: string;
+  status: string;
+  to: string;
+  method: string;
+}
+
 export function BuyerTransactionsPage() {
-  const [selectedTxn, setSelectedTxn] = useState<any>(null);
+  const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [showToast, setShowToast] = useState<{
     message: string;
@@ -77,7 +87,7 @@ export function BuyerTransactionsPage() {
     });
     setTimeout(() => setShowToast(null), 3000);
   };
-  const openDetail = (txn: any) => {
+  const openDetail = (txn: Transaction) => {
     setSelectedTxn(txn);
     setIsDetailModalOpen(true);
   };

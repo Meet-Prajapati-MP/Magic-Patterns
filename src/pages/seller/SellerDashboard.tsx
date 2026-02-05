@@ -96,7 +96,7 @@ export function SellerDashboard() {
           </div>
           <div className="flex items-center space-x-3">
             <Link to="/seller/invoices/create">
-              <Button className="text-blue-700 border-[#DBEAFE] bg-[#F0F9FF] hover:bg-[#E0F2FE] transition-colors duration-200" leftIcon={<Plus className="h-4 w-4" />}>
+              <Button variant="outline" className="text-blue-700 border-[#DBEAFE] bg-white hover:bg-[#F0F9FF] transition-colors duration-200" leftIcon={<Plus className="h-4 w-4" />}>
                 Create Invoice
               </Button>
             </Link>

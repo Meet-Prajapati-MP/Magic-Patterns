@@ -118,8 +118,7 @@ export function UserDetailPage() {
                 </div>
                 <div className="flex items-center text-sm">
                   <Shield className="h-4 w-4 text-slate-400 mr-3" />
-                  KYC:{' '}
-                  <span className="text-green-600 font-medium ml-1">
+                  KYC: <span className="text-green-600 font-medium ml-1">
                     {user.kycStatus}
                   </span>
                 </div>

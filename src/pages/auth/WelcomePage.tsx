@@ -7,8 +7,22 @@ export function WelcomePage() {
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold text-2xl">T</span>
+          <div className="h-12 w-12 rounded-xl flex items-center justify-center overflow-hidden">
+            <img 
+              src="/logo.png" 
+              alt="Trustopay Logo" 
+              className="h-full w-full object-contain"
+              onError={(e) => {
+                // Fallback to blue background with T if image fails to load
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const parent = target.parentElement;
+                if (parent) {
+                  parent.className = 'h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center';
+                  parent.innerHTML = '<span class="text-white font-bold text-2xl">T</span>';
+                }
+              }}
+            />
           </div>
         </div>
         <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-slate-900">
@@ -75,12 +89,9 @@ export function WelcomePage() {
           </Link>
         </div>
         <p className="mt-6 text-center text-xs text-slate-500">
-          By continuing, you agree to our{' '}
-          <Link to="/terms" className="text-blue-600 hover:underline">
+          By continuing, you agree to our <Link to="/terms" className="text-blue-600 hover:underline">
             Terms of Service
-          </Link>{' '}
-          and{' '}
-          <Link to="/privacy" className="text-blue-600 hover:underline">
+          </Link> and <Link to="/privacy" className="text-blue-600 hover:underline">
             Privacy Policy
           </Link>
           .

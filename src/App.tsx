@@ -131,7 +131,7 @@ function App() {
           <Route path="/help" element={<SupportPage />} />
           {/* Public Payment Flows */}
           <Route path="/invoice/:id/public" element={<PublicInvoicePage />} />
-          <Route path="/i/:token" element={<PublicInvoicePage />} />{' '}
+          <Route path="/i/:token" element={<PublicInvoicePage />} />
           {/* Alias */}
           <Route path="/pay/:token" element={<PaymentFlowPage />} />
           <Route path="/receipts/:id" element={<ReceiptPage />} />

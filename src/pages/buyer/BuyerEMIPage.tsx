@@ -194,8 +194,7 @@ export function BuyerEMIPage() {
 
                       <div className="flex justify-between text-xs text-slate-500">
                         <span>
-                          {plan.completedInstallments}/{plan.tenure}{' '}
-                          installments
+                          {plan.completedInstallments}/{plan.tenure} installments
                         </span>
                         {plan.status === 'active' &&
                       <span>

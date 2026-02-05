@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -17,14 +17,40 @@ import {
 'lucide-react';
 import { Dropdown } from '../ui/Dropdown';
 import { useProfile } from '../context/ProfileContext';
+import { getCurrentUserProfile, getUserInitials } from '../../services/profileService';
 interface UnifiedLayoutProps {
   children: React.ReactNode;
 }
 export function UnifiedLayout({ children }: UnifiedLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [userInitials, setUserInitials] = useState('');
+  const [accountType, setAccountType] = useState<'individual' | 'business'>('individual');
   const location = useLocation();
   const navigate = useNavigate();
   const { currentAccount } = useProfile();
+
+  // Fetch user profile on mount
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      const { data: profile, error } = await getCurrentUserProfile();
+      if (profile && !error) {
+        const name = profile.name || 'User';
+        setUserName(name);
+        setUserInitials(getUserInitials(name));
+        setAccountType(profile.account_type);
+      } else if (currentAccount) {
+        // Fallback to context if profile fetch fails
+        const name = currentAccount.accountType === 'individual' 
+          ? currentAccount.name 
+          : currentAccount.businessName || 'User';
+        setUserName(name);
+        setUserInitials(getUserInitials(name));
+        setAccountType(currentAccount.accountType);
+      }
+    };
+    fetchUserProfile();
+  }, [currentAccount]);
   // Same navigation for both Individual and Business
   const navigation = [
   {
@@ -79,8 +105,22 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
       <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-slate-200 fixed inset-y-0 z-50">
         <div className="p-6 border-b border-slate-100">
           <div className="flex items-center space-x-2">
-            <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">T</span>
+            <div className="h-8 w-8 rounded-lg flex items-center justify-center overflow-hidden">
+              <img 
+                src="/logo.png" 
+                alt="Trustopay Logo" 
+                className="h-full w-full object-contain"
+                onError={(e) => {
+                  // Fallback to blue background with T if image fails to load
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent) {
+                    parent.className = 'h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center';
+                    parent.innerHTML = '<span class="text-white font-bold text-lg">T</span>';
+                  }
+                }}
+              />
             </div>
             <span className="text-xl font-bold text-slate-900">Trustopay</span>
           </div>
@@ -104,22 +144,24 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
         <div className="p-4 border-t border-slate-100">
           <div className="flex items-center p-3 rounded-lg bg-slate-50 border border-slate-100">
             <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold">
-              {currentAccount.accountType === 'individual' ?
-              <User className="h-5 w-5" /> :
-
-              <Building2 className="h-5 w-5" />
-              }
+              {userInitials ? (
+                <span className="text-sm">{userInitials}</span>
+              ) : (
+                accountType === 'individual' ? (
+                  <User className="h-5 w-5" />
+                ) : (
+                  <Building2 className="h-5 w-5" />
+                )
+              )}
             </div>
             <div className="ml-3 flex-1 min-w-0">
               <p className="text-sm font-medium text-slate-900 truncate">
-                {currentAccount.accountType === 'individual' ?
-                currentAccount.name :
-                currentAccount.businessName}
+                {userName || (currentAccount.accountType === 'individual' 
+                  ? currentAccount.name 
+                  : currentAccount.businessName) || 'User'}
               </p>
               <p className="text-xs text-slate-500 truncate">
-                {currentAccount.accountType === 'individual' ?
-                'Individual Account' :
-                'Business Account'}
+                {accountType === 'individual' ? 'Individual Account' : 'Business Account'}
               </p>
             </div>
           </div>
@@ -129,8 +171,22 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-slate-200 px-4 h-16 flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-lg">T</span>
+          <div className="h-8 w-8 rounded-lg flex items-center justify-center overflow-hidden">
+            <img 
+              src="/logo.png" 
+              alt="Trustopay Logo" 
+              className="h-full w-full object-contain"
+              onError={(e) => {
+                // Fallback to blue background with T if image fails to load
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const parent = target.parentElement;
+                if (parent) {
+                  parent.className = 'h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center';
+                  parent.innerHTML = '<span class="text-white font-bold text-lg">T</span>';
+                }
+              }}
+            />
           </div>
           <span className="text-lg font-bold text-slate-900">Trustopay</span>
         </div>

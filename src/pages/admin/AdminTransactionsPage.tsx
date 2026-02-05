@@ -8,8 +8,19 @@ import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { Toast } from '../../components/ui/Toast';
 import { Timeline } from '../../components/shared/Timeline';
+interface AdminTransaction {
+  id: string;
+  date: string;
+  type: string;
+  amount: string;
+  status: string;
+  payer: string;
+  payee: string;
+  method: string;
+}
+
 export function AdminTransactionsPage() {
-  const [selectedTxn, setSelectedTxn] = useState<any>(null);
+  const [selectedTxn, setSelectedTxn] = useState<AdminTransaction | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [showToast, setShowToast] = useState<{
     message: string;
@@ -124,7 +135,7 @@ export function AdminTransactionsPage() {
     });
     setTimeout(() => setShowToast(null), 3000);
   };
-  const openDetail = (txn: any) => {
+  const openDetail = (txn: AdminTransaction) => {
     setSelectedTxn(txn);
     setIsDetailModalOpen(true);
   };

@@ -1,4 +1,5 @@
-import React, { useState, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { getCurrentUserProfile } from '../../services/profileService';
 export type AccountType = 'individual' | 'business';
 export interface UserAccount {
   id: string;
@@ -22,15 +23,39 @@ interface ProfileContextType {
 }
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 export function ProfileProvider({ children }: {children: ReactNode;}) {
-  // Mock account - in real app, fetch from API based on login
+  // Default account - will be updated from Supabase
   const [currentAccount, setCurrentAccount] = useState<UserAccount>({
-    id: '1',
+    id: '',
     accountType: 'individual',
-    name: 'Ankit Sharma',
-    email: 'ankit@example.com',
-    phone: '+91 98765 43210',
-    pan: 'ABCDE1234F'
+    name: 'User',
+    email: '',
+    phone: '',
+    pan: ''
   });
+
+  // Fetch user profile from Supabase on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const { data: profile, error } = await getCurrentUserProfile();
+      if (profile && !error) {
+        setCurrentAccount({
+          id: profile.id,
+          accountType: profile.account_type,
+          name: profile.name || 'User',
+          email: profile.email || '',
+          phone: profile.phone || '',
+          pan: profile.pan || undefined,
+          businessName: profile.business_name || undefined,
+          businessLogo: profile.business_logo || undefined,
+          gst: profile.gst || undefined,
+          companyDocs: profile.company_docs || undefined,
+          businessAddress: profile.business_address || undefined
+        });
+      }
+    };
+    fetchProfile();
+  }, []);
+
   const updateAccount = (data: Partial<UserAccount>) => {
     setCurrentAccount({
       ...currentAccount,

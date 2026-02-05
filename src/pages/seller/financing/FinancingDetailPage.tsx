@@ -59,7 +59,7 @@ export function FinancingDetailPage() {
   }];
 
   // Import Wallet icon locally since it's used in timeline
-  function Wallet(props: any) {
+  function Wallet(props: React.SVGProps<SVGSVGElement>) {
     return (
       <svg
         {...props}

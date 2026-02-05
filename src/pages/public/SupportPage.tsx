@@ -142,11 +142,9 @@ export function SupportPage() {
 
           <div className="mt-12">
             <p className="text-sm text-slate-500">
-              Check our{' '}
-              <Link to="#" className="text-blue-600 hover:underline">
+              Check our <Link to="#" className="text-blue-600 hover:underline">
                 System Status
-              </Link>{' '}
-              page for real-time updates.
+              </Link> page for real-time updates.
             </p>
           </div>
         </div>
