@@ -6,13 +6,14 @@ import { upsertUserProfile } from '../../services/profileService';
 import { AlertCircle, CheckCircle, Mail } from 'lucide-react';
 
 export function VerifyOTPPage() {
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otp, setOtp] = useState(['', '', '', '', '', '']); // 6 digits only
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [timer, setTimer] = useState(60); // 60 seconds cooldown
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const verifyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const email = searchParams.get('email') || '';
@@ -36,6 +37,15 @@ export function VerifyOTPPage() {
     }
   }, []);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (verifyTimeoutRef.current) {
+        clearTimeout(verifyTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleChange = (element: HTMLInputElement, index: number) => {
     const value = element.value;
     
@@ -57,8 +67,23 @@ export function VerifyOTPPage() {
     }
 
     // Auto-submit when all 6 digits are entered
+    // Clear any existing timeout to prevent multiple submissions
+    if (verifyTimeoutRef.current) {
+      clearTimeout(verifyTimeoutRef.current);
+    }
+
+    // Add a small delay to ensure state is updated and user has finished typing
     if (newOtp.every(digit => digit !== '') && index === 5) {
-      handleVerify(newOtp.join(''));
+      verifyTimeoutRef.current = setTimeout(() => {
+        // Get fresh state to ensure we have the latest OTP values
+        setOtp(currentOtp => {
+          const code = currentOtp.join('');
+          if (code.length === 6 && !isLoading) {
+            handleVerify(code);
+          }
+          return currentOtp;
+        });
+      }, 300); // 300ms delay to ensure state is fully updated
     }
   };
 
@@ -72,7 +97,7 @@ export function VerifyOTPPage() {
     if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       navigator.clipboard.readText().then(text => {
-        const digits = text.replace(/\D/g, '').slice(0, 6);
+        const digits = text.replace(/\D/g, '').slice(0, 6); // Take first 6 digits only
         if (digits.length === 6) {
           const newOtp = digits.split('');
           setOtp(newOtp);
@@ -85,6 +110,11 @@ export function VerifyOTPPage() {
   };
 
   const handleVerify = async (otpValue?: string) => {
+    // Prevent multiple simultaneous verification attempts
+    if (isLoading) {
+      return;
+    }
+
     const otpCode = otpValue || otp.join('');
     
     if (otpCode.length !== 6) {

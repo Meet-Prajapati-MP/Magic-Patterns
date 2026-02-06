@@ -206,11 +206,13 @@ export const verifyEmailOTP = async (
       };
     }
 
-    // Validate OTP format (6 digits)
-    if (!/^\d{6}$/.test(otp)) {
+    // Validate OTP format (must be 6 digits)
+    const otpDigits = otp.replace(/\D/g, ''); // Remove non-digits
+    
+    if (!/^\d{6}$/.test(otpDigits)) {
       return {
         success: false,
-        message: 'OTP must be 6 digits',
+        message: 'OTP must be exactly 6 digits',
         error: 'Invalid OTP format'
       };
     }
@@ -218,33 +220,64 @@ export const verifyEmailOTP = async (
     const trimmedEmail = email.trim().toLowerCase();
 
     // Verify OTP using Supabase Auth
+    // Note: Supabase may generate 6-8 digit tokens, but the email template
+    // should be configured to display only the first 6 digits.
+    // We verify with the 6-digit code entered by the user.
+    console.log('🔐 Verifying OTP:', {
+      email: trimmedEmail,
+      tokenLength: otpDigits.length,
+      tokenPreview: otpDigits.substring(0, 2) + '****'
+    });
+
     const { data, error } = await supabaseClient.auth.verifyOtp({
       email: trimmedEmail,
-      token: otp,
+      token: otpDigits,
       type: 'email'
     });
 
+    // If verification fails with "invalid" and we used 6 digits,
+    // it might be because Supabase generated an 8-digit token.
+    // However, since the email template shows only 6 digits, we can't get the full token.
+    // So we'll return a clear error message.
     if (error) {
-      // Handle specific error cases
-      if (error.message.includes('expired')) {
+      console.error('OTP Verification Error:', {
+        email: trimmedEmail,
+        tokenLength: otpDigits.length,
+        errorMessage: error.message,
+        errorCode: error.status || error.code
+      });
+
+      // Handle specific error cases with better messages
+      const errorMsg = error.message.toLowerCase();
+      
+      if (errorMsg.includes('expired') || errorMsg.includes('expir')) {
         return {
           success: false,
-          message: 'OTP has expired. Please request a new one.',
+          message: 'OTP has expired. Please request a new verification code.',
           error: error.message
         };
       }
 
-      if (error.message.includes('invalid') || error.message.includes('incorrect')) {
+      if (errorMsg.includes('invalid') || errorMsg.includes('incorrect') || errorMsg.includes('token')) {
+        // Check if this might be a token length issue
+        if (errorMsg.includes('token') && !errorMsg.includes('expired')) {
+          return {
+            success: false,
+            message: 'Invalid verification code. Please check the 6-digit code from your email and try again.',
+            error: error.message
+          };
+        }
         return {
           success: false,
-          message: 'Invalid OTP. Please check and try again.',
+          message: 'Invalid verification code. Please check and try again.',
           error: error.message
         };
       }
 
+      // Generic error handling
       return {
         success: false,
-        message: error.message || 'Failed to verify OTP',
+        message: error.message || 'Failed to verify OTP. Please try again.',
         error: error.message
       };
     }
