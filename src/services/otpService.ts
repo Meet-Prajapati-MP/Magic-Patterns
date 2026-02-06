@@ -135,42 +135,52 @@ export const sendEmailOTP = async (
       console.error('  Email:', trimmedEmail);
       
       // Handle rate limiting (too many requests)
+      // Supabase rate limits are PER EMAIL ADDRESS, not per device
+      // If one device hits the limit for an email, all devices using that email will be blocked
       // Only show rate limit error if it's a confirmed 429 status code
-      // This prevents false positives from other error messages
+      // This prevents false positives that could affect other users
+      
+      // STRICT CHECK: Only treat as rate limit if HTTP 429 status code
+      // Supabase returns 429 for rate limits, so we only check status code
       if (error.status === 429) {
-        console.warn('⚠️ Rate limit exceeded (HTTP 429) for:', trimmedEmail);
-        // Check if error message specifically mentions rate limiting
         const errorMsgLower = error.message.toLowerCase();
-        if (errorMsgLower.includes('rate limit') || errorMsgLower.includes('too many')) {
+        
+        // Double-check that the error message is related to rate limiting
+        // Some 429 errors might be for other reasons
+        const isRateLimitRelated = 
+          errorMsgLower.includes('rate limit') ||
+          errorMsgLower.includes('too many') ||
+          errorMsgLower.includes('quota') ||
+          errorMsgLower.includes('throttle') ||
+          errorMsgLower.includes('exceeded');
+        
+        console.warn('⚠️ Rate limit detected (HTTP 429):', {
+          status: error.status,
+          message: error.message,
+          email: trimmedEmail,
+          isRateLimitRelated
+        });
+        
+        if (isRateLimitRelated) {
+          // Rate limit is per email address, not per device
           return {
             success: false,
-            message: `Too many verification requests. Please try again in a few minutes.`,
+            message: `Too many verification requests for ${trimmedEmail}. Please wait 1 hour or use a different email address.`,
+            error: error.message
+          };
+        } else {
+          // 429 but not rate limit related - might be a different issue
+          console.warn('⚠️ HTTP 429 received but message does not indicate rate limit');
+          return {
+            success: false,
+            message: 'Service is temporarily busy. Please try again in a few minutes.',
             error: error.message
           };
         }
-        // If 429 but message doesn't mention rate limit, it might be a different issue
-        // Return generic message
-        return {
-          success: false,
-          message: 'Service is temporarily busy. Please try again in a few minutes.',
-          error: error.message
-        };
       }
       
-      // Only check for rate limit in message if status is not 429 (to avoid duplicates)
-      // This is a fallback for cases where rate limit is mentioned but status code is different
-      const errorMsgLower = error.message.toLowerCase();
-      if (
-        (errorMsgLower.includes('rate limit') || errorMsgLower.includes('too many requests')) &&
-        error.status !== 429
-      ) {
-        console.warn('⚠️ Rate limit mentioned in error message for:', trimmedEmail);
-        return {
-          success: false,
-          message: 'Too many verification requests. Please try again in a few minutes.',
-          error: error.message
-        };
-      }
+      // Do NOT check for rate limit in error message if status is not 429
+      // This prevents false positives that could affect other users/devices
 
       // Handle invalid email errors
       if (
