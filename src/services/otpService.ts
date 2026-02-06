@@ -135,15 +135,39 @@ export const sendEmailOTP = async (
       console.error('  Email:', trimmedEmail);
       
       // Handle rate limiting (too many requests)
-      if (
-        error.message.includes('rate limit') || 
-        error.message.toLowerCase().includes('too many') ||
-        error.status === 429
-      ) {
-        console.warn('⚠️ Rate limit exceeded for:', trimmedEmail);
+      // Only show rate limit error if it's a confirmed 429 status code
+      // This prevents false positives from other error messages
+      if (error.status === 429) {
+        console.warn('⚠️ Rate limit exceeded (HTTP 429) for:', trimmedEmail);
+        // Check if error message specifically mentions rate limiting
+        const errorMsgLower = error.message.toLowerCase();
+        if (errorMsgLower.includes('rate limit') || errorMsgLower.includes('too many')) {
+          return {
+            success: false,
+            message: `Too many verification requests. Please try again in a few minutes.`,
+            error: error.message
+          };
+        }
+        // If 429 but message doesn't mention rate limit, it might be a different issue
+        // Return generic message
         return {
           success: false,
-          message: 'Too many requests. Please try again in a few minutes.',
+          message: 'Service is temporarily busy. Please try again in a few minutes.',
+          error: error.message
+        };
+      }
+      
+      // Only check for rate limit in message if status is not 429 (to avoid duplicates)
+      // This is a fallback for cases where rate limit is mentioned but status code is different
+      const errorMsgLower = error.message.toLowerCase();
+      if (
+        (errorMsgLower.includes('rate limit') || errorMsgLower.includes('too many requests')) &&
+        error.status !== 429
+      ) {
+        console.warn('⚠️ Rate limit mentioned in error message for:', trimmedEmail);
+        return {
+          success: false,
+          message: 'Too many verification requests. Please try again in a few minutes.',
           error: error.message
         };
       }
