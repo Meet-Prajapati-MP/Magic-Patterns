@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Search,
   Filter,
@@ -19,6 +19,8 @@ import { Modal } from '../../components/ui/Modal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Toast } from '../../components/ui/Toast';
 import { getSellerInvoices, formatAmount, formatDate } from '../../services/invoiceService';
+import { diagnoseInvoiceSystem, printDiagnostics } from '../../utils/invoiceDebug';
+import { supabaseClient } from '../../supabase-client';
 export function InvoiceListPage() {
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,7 +69,43 @@ export function InvoiceListPage() {
       setIsLoading(true);
       console.log('📋 Fetching invoices...');
       
+      // First, check authentication
+      const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+      if (authError || !user) {
+        console.error('❌ Not authenticated:', authError);
+        setShowToast({
+          message: 'Please log in to view invoices',
+          type: 'error'
+        });
+        setIsLoading(false);
+        return;
+      }
+      console.log('✅ Authenticated user ID:', user.id);
+      
+      // Run diagnostics if no invoices found (first time or debugging)
+      const { data: initialCheck, error: initialError } = await getSellerInvoices();
+      console.log('🔍 Initial check result:', {
+        dataLength: initialCheck?.length || 0,
+        error: initialError,
+        data: initialCheck
+      });
+      
+      if (!initialCheck || initialCheck.length === 0) {
+        console.log('🔍 No invoices found. Running diagnostics...');
+        const diagnostics = await diagnoseInvoiceSystem();
+        printDiagnostics(diagnostics);
+      }
+      
       const { data, error } = await getSellerInvoices();
+      
+      console.log('📊 Final fetch result:', {
+        dataLength: data?.length || 0,
+        error: error,
+        hasData: !!data,
+        dataType: Array.isArray(data) ? 'array' : typeof data,
+        dataIsNull: data === null,
+        dataIsUndefined: data === undefined
+      });
       
       if (error) {
         console.error('❌ Error fetching invoices:', error);
@@ -79,23 +117,38 @@ export function InvoiceListPage() {
         return;
       }
 
+      // Handle null data (should be empty array)
+      if (data === null) {
+        console.warn('⚠️ getSellerInvoices returned null instead of array');
+        setInvoices([]);
+        setIsLoading(false);
+        return;
+      }
+
       console.log('✅ Fetched invoices:', data?.length || 0, 'invoices');
-      console.log('Invoice data:', data);
+      console.log('📄 Raw invoice data:', JSON.stringify(data, null, 2));
       
-      if (data && data.length > 0) {
+      if (data && Array.isArray(data) && data.length > 0) {
+        console.log('🔄 Transforming invoices...');
         // Transform Supabase data to UI format
-        const transformedInvoices = data.map(invoice => ({
-          id: invoice.invoice_number,
-          client: invoice.client_name,
-          date: formatDate(invoice.invoice_date),
-          due: invoice.due_date ? formatDate(invoice.due_date) : '-',
-          amount: formatAmount(invoice.total_amount),
-          status: invoice.status
-        }));
+        const transformedInvoices = data.map(invoice => {
+          console.log('📝 Transforming invoice:', invoice.invoice_number);
+          return {
+            id: invoice.invoice_number,
+            client: invoice.client_name,
+            date: formatDate(invoice.invoice_date),
+            due: invoice.due_date ? formatDate(invoice.due_date) : '-',
+            amount: formatAmount(invoice.total_amount),
+            status: invoice.status
+          };
+        });
+        console.log('✅ Transformed invoices:', transformedInvoices);
         setInvoices(transformedInvoices);
-        console.log('✅ Transformed invoices:', transformedInvoices.length, 'invoices');
+        console.log('✅ Set invoices state with', transformedInvoices.length, 'invoices');
       } else {
         console.log('ℹ️ No invoices found. This is normal if you haven\'t created any invoices yet.');
+        console.log('🔍 Debug: data is', data);
+        console.log('🔍 Debug: data length is', data?.length);
         setInvoices([]);
         // Don't show error toast for empty data - it's normal
       }
@@ -251,10 +304,10 @@ export function InvoiceListPage() {
                     </td>
                   </tr>
                 ) : filteredInvoices.length > 0 ? (
-                filteredInvoices.map((invoice) =>
-                <tr
-                  key={invoice.id}
-                  className="hover:bg-slate-50 transition-colors">
+                filteredInvoices.map((invoice) => (
+                  <tr
+                    key={invoice.id}
+                    className="hover:bg-slate-50 transition-colors">
 
                       <td className="py-4 px-6 text-sm font-medium text-blue-600 hover:underline cursor-pointer">
                         <Link to={`/seller/invoices/${invoice.id}`}>
@@ -275,52 +328,51 @@ export function InvoiceListPage() {
                       </td>
                       <td className="py-4 px-6">
                         <StatusPill
-                      status={
-                      invoice.status === 'paid' ?
-                      'success' :
-                      invoice.status === 'pending' ?
-                      'warning' :
-                      invoice.status === 'overdue' ?
-                      'error' :
-                      'neutral'
-                      }>
-
+                          status={
+                            invoice.status === 'paid' ?
+                            'success' :
+                            invoice.status === 'pending' ?
+                            'warning' :
+                            invoice.status === 'overdue' ?
+                            'error' :
+                            'neutral'
+                          }>
                           {invoice.status.charAt(0).toUpperCase() +
-                      invoice.status.slice(1)}
+                            invoice.status.slice(1)}
                         </StatusPill>
                       </td>
                       <td className="py-4 px-6 text-right">
                         <Dropdown
-                      items={[
-                      {
-                        label: 'View Details',
-                        icon: <Eye className="h-4 w-4" />,
-                        onClick: () => {} // Navigate to details
-                      },
-                      {
-                        label: 'Edit Invoice',
-                        icon: <Edit className="h-4 w-4" />,
-                        onClick: () => {} // Navigate to edit
-                      },
-                      {
-                        label: 'Download PDF',
-                        icon: <FileText className="h-4 w-4" />,
-                        onClick: () =>
-                        setShowToast({
-                          message: 'Downloading PDF...',
-                          type: 'success'
-                        })
-                      },
-                      {
-                        label: 'Delete',
-                        icon: <Trash2 className="h-4 w-4" />,
-                        variant: 'danger',
-                        onClick: () => setDeleteId(invoice.id)
-                      }]
-                      } />
-
+                          items={[
+                            {
+                              label: 'View Details',
+                              icon: <Eye className="h-4 w-4" />,
+                              onClick: () => {} // Navigate to details
+                            },
+                            {
+                              label: 'Edit Invoice',
+                              icon: <Edit className="h-4 w-4" />,
+                              onClick: () => {} // Navigate to edit
+                            },
+                            {
+                              label: 'Download PDF',
+                              icon: <FileText className="h-4 w-4" />,
+                              onClick: () =>
+                                setShowToast({
+                                  message: 'Downloading PDF...',
+                                  type: 'success'
+                                })
+                            },
+                            {
+                              label: 'Delete',
+                              icon: <Trash2 className="h-4 w-4" />,
+                              variant: 'danger',
+                              onClick: () => setDeleteId(invoice.id)
+                            }]
+                          } />
                       </td>
                     </tr>
+                ))
                 ) :
 
                 <tr>
@@ -406,7 +458,7 @@ export function InvoiceListPage() {
           message="Are you sure you want to delete this invoice? This action cannot be undone."
           confirmText="Delete Invoice"
           cancelText="Cancel"
-          variant="danger" />
+          isDestructive={true} />
 
       </div>
     </SellerLayout>);

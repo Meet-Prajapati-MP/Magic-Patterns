@@ -44,7 +44,7 @@ export function Button({
       disabled={disabled || isLoading}
       {...props}>
 
-      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin text-current" />}
       {!isLoading && leftIcon && <span className="mr-2">{leftIcon}</span>}
       {children}
       {!isLoading && rightIcon && <span className="ml-2">{rightIcon}</span>}

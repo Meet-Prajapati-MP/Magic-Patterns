@@ -68,10 +68,21 @@ export function BuyerInvoicesPage() {
     const fetchInvoices = async () => {
       setIsLoading(true);
       
-      // For buyer invoices, we need to get invoices where buyer_id matches
-      // Since we're bypassing auth, we'll get all invoices for now
-      // In production, this should filter by buyer_id
-      const { data, error } = await getBuyerInvoices();
+      // First, check authentication
+      const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+      if (authError || !user) {
+        console.error('❌ Not authenticated:', authError);
+        setShowToast({
+          message: 'Please log in to view invoices',
+          type: 'error'
+        });
+        setIsLoading(false);
+        return;
+      }
+      console.log('✅ Authenticated user ID:', user.id);
+      
+      // Pass authenticated user ID to getBuyerInvoices
+      const { data, error } = await getBuyerInvoices(user.id);
       
       if (error) {
         console.error('❌ Error fetching invoices:', error);
@@ -84,6 +95,25 @@ export function BuyerInvoicesPage() {
       }
 
       console.log('✅ Fetched buyer invoices:', data?.length || 0, 'invoices');
+      
+      // If no invoices found, run diagnostics
+      if (!data || data.length === 0) {
+        console.warn('⚠️ No invoices found. Running diagnostics...');
+        console.log('🔍 Your user ID:', user.id);
+        
+        // Check if invoices exist with NULL buyer_id
+        const { data: nullBuyerInvoices } = await supabaseClient
+          .from('invoices')
+          .select('id, invoice_number, buyer_id, client_email')
+          .is('buyer_id', null)
+          .limit(5);
+        
+        console.log('🔍 Invoices with NULL buyer_id:', nullBuyerInvoices?.length || 0);
+        if (nullBuyerInvoices && nullBuyerInvoices.length > 0) {
+          console.warn('⚠️ Found invoices with NULL buyer_id. They need to be assigned to you.');
+          console.log('📋 Sample invoices:', nullBuyerInvoices);
+        }
+      }
 
       if (data && data.length > 0) {
         // Get seller names from profiles

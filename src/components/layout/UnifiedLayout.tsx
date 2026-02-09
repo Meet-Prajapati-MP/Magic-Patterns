@@ -161,7 +161,17 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
                   : currentAccount.businessName) || 'User'}
               </p>
               <p className="text-xs text-slate-500 truncate">
-                {accountType === 'individual' ? 'Individual Account' : 'Business Account'}
+                {(() => {
+                  // Determine account type based on current route
+                  const path = location.pathname;
+                  if (path.startsWith('/seller')) {
+                    return 'Seller';
+                  } else if (path.startsWith('/buyer')) {
+                    return 'Buyer';
+                  }
+                  // Fallback to account type
+                  return accountType === 'individual' ? 'Individual Account' : 'Business Account';
+                })()}
               </p>
             </div>
           </div>

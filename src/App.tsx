@@ -34,9 +34,9 @@ import { OnboardingPage } from './pages/auth/OnboardingPage';
 // Dev
 import { DevOTPInboxPage } from './pages/dev/DevOTPInboxPage';
 // Seller
-// import { SellerDashboard } from './pages/seller/SellerDashboard';
-// import { InvoiceListPage } from './pages/seller/InvoiceListPage';
-// import { CreateInvoicePage } from './pages/seller/CreateInvoicePage';
+import { SellerDashboard } from './pages/seller/SellerDashboard';
+import { InvoiceListPage } from './pages/seller/InvoiceListPage';
+import { CreateInvoicePage } from './pages/seller/CreateInvoicePage';
 // import { InvoiceDetailPage } from './pages/seller/InvoiceDetailPage';
 // import { ClientsPage } from './pages/seller/ClientsPage';
 // import { ClientDetailPage } from './pages/seller/ClientDetailPage';
@@ -170,18 +170,11 @@ function App() {
           <Route path="/payment/success" element={<PaymentSuccessPage />} />
           <Route path="/payment/failure" element={<PaymentFailurePage />} />
           <Route path="/autopay/setup" element={<AutopaySetupPage />} />
-          {/* Legacy Routes (redirect to unified) */}
-          <Route
-            path="/seller/dashboard"
-            element={<Navigate to="/dashboard" replace />} />
-
-          <Route
-            path="/seller/invoices"
-            element={<Navigate to="/invoices" replace />} />
-
-          <Route
-            path="/seller/invoices/create"
-            element={<Navigate to="/invoices/create" replace />} />
+          
+          {/* Seller Routes - Use Seller Pages */}
+          <Route path="/seller/dashboard" element={<SellerDashboard />} />
+          <Route path="/seller/invoices" element={<InvoiceListPage />} />
+          <Route path="/seller/invoices/create" element={<CreateInvoicePage />} />
 
           <Route
             path="/seller/transactions"

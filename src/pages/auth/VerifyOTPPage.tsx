@@ -65,32 +65,22 @@ export function VerifyOTPPage() {
     if (value && index < 5 && inputRefs.current[index + 1]) {
       inputRefs.current[index + 1]?.focus();
     }
-
-    // Auto-submit when all 6 digits are entered
-    // Clear any existing timeout to prevent multiple submissions
-    if (verifyTimeoutRef.current) {
-      clearTimeout(verifyTimeoutRef.current);
-    }
-
-    // Add a small delay to ensure state is updated and user has finished typing
-    if (newOtp.every(digit => digit !== '') && index === 5) {
-      verifyTimeoutRef.current = setTimeout(() => {
-        // Get fresh state to ensure we have the latest OTP values
-        setOtp(currentOtp => {
-          const code = currentOtp.join('');
-          if (code.length === 6 && !isLoading) {
-            handleVerify(code);
-          }
-          return currentOtp;
-        });
-      }, 300); // 300ms delay to ensure state is fully updated
-    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
     // Handle backspace
     if (e.key === 'Backspace' && !otp[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
+    }
+    
+    // Handle Enter key - verify OTP when all digits are filled
+    if (e.key === 'Enter') {
+      const currentOtp = [...otp];
+      currentOtp[index] = (e.target as HTMLInputElement).value.slice(-1);
+      const code = currentOtp.join('');
+      if (code.length === 6) {
+        handleVerify(code);
+      }
     }
     
     // Handle paste
@@ -102,8 +92,7 @@ export function VerifyOTPPage() {
           const newOtp = digits.split('');
           setOtp(newOtp);
           inputRefs.current[5]?.focus();
-          // Auto-verify after paste
-          setTimeout(() => handleVerify(digits), 100);
+          // Don't auto-verify on paste - let user click button
         }
       });
     }

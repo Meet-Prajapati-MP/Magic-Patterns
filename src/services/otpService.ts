@@ -117,12 +117,20 @@ export const sendEmailOTP = async (
     // Step 5: Send OTP using Supabase Auth
     // Note: Supabase generates a token that can be used as OTP code
     // The email template must use {{ .Token }} to display the code
+    // IMPORTANT: Supabase uses different email templates based on user status:
+    // - "Magic Link" template for new/existing users (if has {{ .Token }})
+    // - "OTP" template for OTP-based auth (might be separate)
+    // - "Change Email" template for email changes
+    // Make sure ALL templates in Supabase Dashboard include {{ .Token }}
     const { data, error } = await supabaseClient.auth.signInWithOtp({
       email: trimmedEmail,
       options: {
-        emailRedirectTo: redirectTo,
+        emailRedirectTo: redirectTo, // Keep redirect for magic link fallback
         data: metadata,
-        shouldCreateUser: true // Allow new user creation
+        shouldCreateUser: true, // Allow new user creation
+        // Note: Supabase will send both OTP ({{ .Token }}) and magic link ({{ .ConfirmationURL }})
+        // The email template in Supabase Dashboard must include {{ .Token }} to show the OTP code
+        // If user gets only link, check "OTP" template in Supabase Dashboard (not just "Magic Link")
       }
     });
 
@@ -130,8 +138,11 @@ export const sendEmailOTP = async (
     if (error) {
       // Log comprehensive error details for debugging
       console.error('❌ Supabase Email OTP Error:');
-      console.error('  Code:', error.status || error.code);
-      console.error('  Message:', error.message);
+      console.error('  Status Code:', error.status || error.code);
+      console.error('  Error Message:', error.message);
+      console.error('  Error Details:', error.details);
+      console.error('  Error Hint:', error.hint);
+      console.error('  Full Error:', JSON.stringify(error, null, 2));
       console.error('  Email:', trimmedEmail);
       
       // Handle rate limiting (too many requests)
@@ -184,24 +195,54 @@ export const sendEmailOTP = async (
 
       // Handle invalid email errors
       if (
-        error.message.toLowerCase().includes('invalid') ||
-        error.message.toLowerCase().includes('email') ||
-        error.status === 400
+        errorMessage.toLowerCase().includes('invalid') ||
+        errorMessage.toLowerCase().includes('email') ||
+        errorStatus === 400
       ) {
         console.warn('⚠️ Invalid email format:', trimmedEmail);
         return {
           success: false,
-          message: 'Invalid email address. Please check and try again.',
-          error: error.message
+          message: errorMessage || 'Invalid email address. Please check and try again.',
+          error: errorMessage
         };
       }
 
-      // Handle other errors
-      console.error('❌ Unexpected error:', error);
+      // Handle network/connection errors
+      if (
+        errorMessage.toLowerCase().includes('network') ||
+        errorMessage.toLowerCase().includes('fetch') ||
+        errorMessage.toLowerCase().includes('connection') ||
+        errorMessage.toLowerCase().includes('failed to fetch')
+      ) {
+        return {
+          success: false,
+          message: 'Network error. Please check your internet connection and try again.',
+          error: errorMessage
+        };
+      }
+
+      // Handle authentication/configuration errors
+      if (
+        errorStatus === 401 ||
+        errorStatus === 403 ||
+        errorMessage.toLowerCase().includes('api key') ||
+        errorMessage.toLowerCase().includes('unauthorized') ||
+        errorMessage.toLowerCase().includes('jwt')
+      ) {
+        console.error('❌ Authentication/Configuration Error');
+        return {
+          success: false,
+          message: errorMessage || 'Configuration error. Please check your Supabase API key.',
+          error: errorMessage
+        };
+      }
+
+      // For all other errors, return the actual error message from Supabase
+      // This helps diagnose the issue - show what Supabase actually says
       return {
         success: false,
-        message: error.message || 'Failed to send verification email. Please try again.',
-        error: error.message
+        message: errorMessage || 'Failed to send verification email. Please try again.',
+        error: errorMessage
       };
     }
 

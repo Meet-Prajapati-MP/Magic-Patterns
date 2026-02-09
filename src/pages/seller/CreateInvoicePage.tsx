@@ -32,6 +32,7 @@ export function CreateInvoicePage() {
     message: string;
     type: 'success' | 'error';
   } | null>(null);
+  const [isSendingInvoice, setIsSendingInvoice] = useState(false);
   const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false);
   // Add Client Form State
   const [newClientCompanyName, setNewClientCompanyName] = useState('');
@@ -218,6 +219,14 @@ export function CreateInvoicePage() {
   };
 
   const handleSendInvoice = async () => {
+    // Start loading animation IMMEDIATELY for better UX
+    console.log('🔄 Setting loading state to true');
+    setIsSendingInvoice(true);
+    
+    // Use setTimeout to ensure React renders the loading state before validation
+    // Small delay ensures the UI updates before async operations
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
     setPaymentFormSubmitted(true);
     
     // Validate payment fields when payment type is 'full'
@@ -229,6 +238,7 @@ export function CreateInvoicePage() {
       setNotesError(notesErr);
       
       if (dateErr || notesErr) {
+        setIsSendingInvoice(false);
         return;
       }
     }
@@ -239,6 +249,7 @@ export function CreateInvoicePage() {
       setNotesError(notesErr);
       
       if (!validateMilestoneDueDates() || notesErr) {
+        setIsSendingInvoice(false);
         return;
       }
     } else {
@@ -247,122 +258,183 @@ export function CreateInvoicePage() {
       setNotesError(notesErr);
       
       if (notesErr) {
+        setIsSendingInvoice(false);
         return;
       }
     }
 
-    // Get client name from selected client or use a default
-    const clientName = selectedClient 
-      ? clients.find(c => c.value === selectedClient)?.label || 'Client'
-      : 'Client';
+    try {
+      // Get client name from selected client or use a default
+      const clientName = selectedClient 
+        ? clients.find(c => c.value === selectedClient)?.label || 'Client'
+        : 'Client';
 
-    // Prepare invoice items
-    const invoiceItems = items.map(item => ({
-      description: item.desc,
-      quantity: item.qty,
-      rate: item.rate,
-      amount: item.qty * item.rate
-    }));
-
-    // Prepare milestones if applicable
-    let invoiceMilestones;
-    if (paymentType === 'milestone' || paymentType === 'split') {
-      const totalAmount = calculateTotal();
-      invoiceMilestones = milestones.map(milestone => ({
-        description: milestone.description,
-        percentage: milestone.percentage,
-        dueDate: milestone.dueDate,
-        amount: (totalAmount * milestone.percentage) / 100
+      // Prepare invoice items
+      const invoiceItems = items.map(item => ({
+        description: item.desc,
+        quantity: item.qty,
+        rate: item.rate,
+        amount: item.qty * item.rate
       }));
-    }
 
-    // Get current user - try auth first, then use placeholder for development
-    let userId: string | null = null;
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    
-    if (user && !userError) {
-      userId = user.id;
-      console.log('Using authenticated user:', userId);
-    } else {
-      // For development: Use a placeholder UUID if RLS is disabled
-      // This allows testing without authentication
-      console.warn('No authenticated user found. Using placeholder user ID for development.');
-      console.warn('NOTE: RLS must be disabled in Supabase for this to work.');
-      
-      // Generate a consistent placeholder UUID based on phone number
-      // This ensures the same user gets the same ID
-      const storedUserData = localStorage.getItem('userData');
-      if (storedUserData) {
-        try {
-          const userData = JSON.parse(storedUserData);
-          // Create a deterministic UUID from phone number
-          // This is only for development when RLS is disabled
-          const phoneHash = userData.phone || 'default';
-          // Simple hash to create consistent UUID-like string
-          userId = '00000000-0000-0000-0000-' + phoneHash.padStart(12, '0').slice(-12);
-          console.log('Using placeholder user ID:', userId);
-        } catch (e) {
-          console.error('Error parsing user data:', e);
-          userId = '00000000-0000-0000-0000-000000000001'; // Fallback placeholder
-        }
-      } else {
-        userId = '00000000-0000-0000-0000-000000000001'; // Fallback placeholder
+      // Prepare milestones if applicable
+      let invoiceMilestones;
+      if (paymentType === 'milestone' || paymentType === 'split') {
+        const totalAmount = calculateTotal();
+        invoiceMilestones = milestones.map(milestone => ({
+          description: milestone.description,
+          percentage: milestone.percentage,
+          dueDate: milestone.dueDate,
+          amount: (totalAmount * milestone.percentage) / 100
+        }));
       }
+
+      // Get current authenticated user - REQUIRED for invoice creation
+      let userId: string | null = null;
+      const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
       
-      console.warn('⚠️ Development mode: Using placeholder user ID. Ensure RLS is disabled in Supabase.');
-    }
+      if (user && !userError) {
+        userId = user.id;
+        console.log('✅ Using authenticated user:', userId);
+      } else {
+        // User must be authenticated to create invoices
+        console.error('❌ No authenticated user found. User must be logged in to create invoices.');
+        setIsSendingInvoice(false);
+        setShowToast({
+          message: 'You must be logged in to create invoices. Please log in and try again.',
+          type: 'error'
+        });
+        return;
+      }
 
-    // Prepare invoice data
-    const invoiceData = {
-      clientId: selectedClient || undefined,
-      clientName: clientName,
-      clientEmail: clientEmail,
-      clientAddress: clientAddress || undefined,
-      clientGstin: clientGstin || undefined,
-      invoiceDate: new Date().toISOString().split('T')[0], // Today's date
-      dueDate: paymentType === 'full' ? dueDate : undefined,
-      paymentType: paymentType as 'full' | 'milestone' | 'split',
-      subtotal: calculateSubtotal(),
-      taxRate: taxEnabled ? 18 : 0,
-      taxAmount: calculateTax(),
-      totalAmount: calculateTotal(),
-      items: invoiceItems,
-      milestones: invoiceMilestones,
-      notes: notes || undefined,
-      status: 'sent' as const,
-      isDraft: false
-    };
+      if (!userId) {
+        setIsSendingInvoice(false);
+        setShowToast({
+          message: 'Unable to identify user. Please log out and log back in.',
+          type: 'error'
+        });
+        return;
+      }
 
-    console.log('📝 Creating invoice with data:', invoiceData);
-    console.log('👤 User ID:', userId);
-    console.log('🔐 Auth check:', await supabaseClient.auth.getUser());
+      // Prepare invoice data
+      const invoiceData = {
+        clientId: selectedClient || undefined,
+        clientName: clientName,
+        clientEmail: clientEmail,
+        clientAddress: clientAddress || undefined,
+        clientGstin: clientGstin || undefined,
+        invoiceDate: new Date().toISOString().split('T')[0], // Today's date
+        dueDate: paymentType === 'full' ? dueDate : undefined,
+        paymentType: paymentType as 'full' | 'milestone' | 'split',
+        subtotal: calculateSubtotal(),
+        taxRate: taxEnabled ? 18 : 0,
+        taxAmount: calculateTax(),
+        totalAmount: calculateTotal(),
+        items: invoiceItems,
+        milestones: invoiceMilestones,
+        notes: notes || undefined,
+        status: 'sent' as const,
+        isDraft: false
+      };
 
-    // Save invoice to Supabase
-    const result = await createInvoice(invoiceData, userId!);
-
-    console.log('✅ Invoice creation result:', result);
-    
-    if (!result.success) {
-      console.error('❌ INVOICE CREATION FAILED!');
-      console.error('Error:', result.error);
-      console.error('User ID used:', userId);
-      console.error('Auth session:', await supabaseClient.auth.getSession());
-    }
-
-    if (result.success) {
-      setShowToast({
-        message: 'Invoice sent successfully!',
-        type: 'success'
+      console.log('📝 ========== STARTING INVOICE CREATION ==========');
+      console.log('📝 Creating invoice with data:', invoiceData);
+      console.log('👤 User ID:', userId);
+      
+      // Verify auth before proceeding
+      const authCheck = await supabaseClient.auth.getUser();
+      console.log('🔐 Auth check result:', {
+        hasUser: !!authCheck.data?.user,
+        userId: authCheck.data?.user?.id,
+        error: authCheck.error,
+        matches: authCheck.data?.user?.id === userId
       });
-      setTimeout(() => {
-        navigate('/seller/invoices');
-      }, 1500);
-    } else {
-      console.error('Invoice creation failed:', result.error);
+      
+      if (!authCheck.data?.user) {
+        console.error('❌ CRITICAL: No authenticated user found!');
+        setIsSendingInvoice(false);
+        setShowToast({
+          message: 'Authentication failed. Please log in again.',
+          type: 'error'
+        });
+        return;
+      }
+
+      // Save invoice to Supabase with comprehensive error handling
+      console.log('💾 ========== CALLING createInvoice() FUNCTION ==========');
+      console.log('💾 Timestamp:', new Date().toISOString());
+      console.log('💾 User ID:', userId);
+      console.log('💾 Invoice data being sent:', JSON.stringify(invoiceData, null, 2));
+      console.log('💾 Supabase Client URL:', supabaseClient.supabaseUrl);
+      
+      const createStartTime = Date.now();
+      const result = await createInvoice(invoiceData, userId);
+      const createDuration = Date.now() - createStartTime;
+      
+      console.log('💾 ========== createInvoice() RETURNED ==========');
+      console.log('💾 Duration:', createDuration, 'ms');
+      console.log('💾 Result:', JSON.stringify(result, null, 2));
+
+      if (result.success) {
+        console.log('✅ Invoice created successfully with ID:', result.invoiceId);
+        console.log('📋 Invoice details:', {
+          invoiceId: result.invoiceId,
+          sellerId: userId,
+          clientEmail: invoiceData.clientEmail,
+          buyerId: invoiceData.buyerId || 'NULL (will be auto-assigned if buyer exists)'
+        });
+        setShowToast({
+          message: 'Invoice created and saved successfully!',
+          type: 'success'
+        });
+        // Keep loading state for smooth transition, then navigate
+        setTimeout(() => {
+          setIsSendingInvoice(false);
+          // Navigate to invoice list - it will auto-refresh on mount
+          navigate('/seller/invoices', { replace: true });
+        }, 1500);
+      } else {
+        console.error('❌ INVOICE CREATION FAILED!');
+        console.error('Error:', result.error);
+        console.error('User ID used:', userId);
+        console.error('Invoice data:', invoiceData);
+        
+        // Stop loading animation on error
+        setIsSendingInvoice(false);
+        
+        // Show detailed error message in toast
+        const errorMessage = result.error || 'Failed to save invoice. Please check all fields and try again.';
+        console.error('📋 Full error details:', {
+          error: result.error,
+          userId: userId,
+          invoiceData: invoiceData,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Also log to console for debugging
+        console.error('🔍 DEBUGGING INFO:');
+        console.error('  - User authenticated:', !!userId);
+        console.error('  - Invoice items count:', invoiceData.items.length);
+        console.error('  - Total amount:', invoiceData.totalAmount);
+        console.error('  - Client email:', invoiceData.clientEmail);
+        
+        setShowToast({
+          message: errorMessage,
+          type: 'error'
+        });
+        
+        // Keep toast visible longer for errors
+        setTimeout(() => setShowToast(null), 8000);
+      }
+    } catch (error: any) {
+      // Handle any unexpected errors
+      console.error('❌ Unexpected error during invoice creation:', error);
+      setIsSendingInvoice(false);
       setShowToast({
-        message: result.error || 'Failed to save invoice. Please check console for details.',
+        message: error?.message || 'An unexpected error occurred. Please try again.',
         type: 'error'
       });
+      setTimeout(() => setShowToast(null), 8000);
     }
   };
   const isFormValid = () => {
@@ -1025,14 +1097,21 @@ export function CreateInvoicePage() {
 
           <Button
             onClick={handleSendInvoice}
-            rightIcon={<Send className="h-4 w-4" />}
+            rightIcon={!isSendingInvoice ? <Send className="h-4 w-4" /> : undefined}
+            isLoading={isSendingInvoice}
             disabled={
+              isSendingInvoice ||
               (paymentType === 'full' && (!dueDate.trim() || !notes.trim())) ||
               (paymentType === 'milestone' && (getTotalPercentage() !== 100 || !notes.trim() || !validateMilestoneDueDates())) ||
               (paymentType === 'split' && (!notes.trim() || !validateMilestoneDueDates()))
-            }>
+            }
+            className={`transition-all duration-300 ${
+              isSendingInvoice 
+                ? 'opacity-90 cursor-wait' 
+                : 'hover:scale-105 active:scale-95'
+            }`}>
 
-              Send Invoice
+              {isSendingInvoice ? 'Sending Invoice...' : 'Send Invoice'}
             </Button>
           }
         </div>
