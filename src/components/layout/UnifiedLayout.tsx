@@ -16,8 +16,10 @@ import {
   Building2 } from
 'lucide-react';
 import { Dropdown } from '../ui/Dropdown';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useProfile } from '../context/ProfileContext';
 import { getCurrentUserProfile, getUserInitials } from '../../services/profileService';
+import { supabaseClient } from '../../supabase-client';
 interface UnifiedLayoutProps {
   children: React.ReactNode;
 }
@@ -26,7 +28,9 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
   const [userName, setUserName] = useState('');
   const [userInitials, setUserInitials] = useState('');
   const [accountType, setAccountType] = useState<'individual' | 'business'>('individual');
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const location = useLocation();
+  const isSellerRoute = location.pathname.startsWith('/seller');
   const navigate = useNavigate();
   const { currentAccount } = useProfile();
 
@@ -51,53 +55,103 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
     };
     fetchUserProfile();
   }, [currentAccount]);
-  // Same navigation for both Individual and Business
-  const navigation = [
-  {
-    name: 'Dashboard',
-    href: '/dashboard',
-    icon: LayoutDashboard
-  },
-  {
-    name: 'Invoices',
-    href: '/invoices',
-    icon: FileText
-  },
-  {
-    name: 'Create Invoice',
-    href: '/invoices/create',
-    icon: PlusCircle
-  },
-  {
-    name: 'Transactions',
-    href: '/transactions',
-    icon: ArrowLeftRight
-  },
-  {
-    name: 'EMI Plans',
-    href: '/emi-plans',
-    icon: PieChart
-  },
-  {
-    name: 'Support',
-    href: '/support',
-    icon: HelpCircle
-  },
-  {
-    name: 'Settings',
-    href: '/settings',
-    icon: Settings
-  }];
+  // Navigation adapts based on whether we're in seller routes or not
+  const navigation = isSellerRoute
+    ? [
+      {
+        name: 'Dashboard',
+        href: '/seller/dashboard',
+        icon: LayoutDashboard
+      },
+      {
+        name: 'Invoices',
+        href: '/seller/invoices',
+        icon: FileText
+      },
+      {
+        name: 'Create Invoice',
+        href: '/seller/invoices/create',
+        icon: PlusCircle
+      },
+      {
+        name: 'Transactions',
+        href: '/transactions',
+        icon: ArrowLeftRight
+      },
+      {
+        name: 'EMI Plans',
+        href: '/emi-plans',
+        icon: PieChart
+      },
+      {
+        name: 'Support',
+        href: '/support',
+        icon: HelpCircle
+      },
+      {
+        name: 'Settings',
+        href: '/settings',
+        icon: Settings
+      }]
+    : [
+      {
+        name: 'Dashboard',
+        href: '/dashboard',
+        icon: LayoutDashboard
+      },
+      {
+        name: 'Invoices',
+        href: '/invoices',
+        icon: FileText
+      },
+      {
+        name: 'Create Invoice',
+        href: '/invoices/create',
+        icon: PlusCircle
+      },
+      {
+        name: 'Transactions',
+        href: '/transactions',
+        icon: ArrowLeftRight
+      },
+      {
+        name: 'EMI Plans',
+        href: '/emi-plans',
+        icon: PieChart
+      },
+      {
+        name: 'Support',
+        href: '/support',
+        icon: HelpCircle
+      },
+      {
+        name: 'Settings',
+        href: '/settings',
+        icon: Settings
+      }];
 
   const isActive = (path: string) => {
     if (path === '/dashboard') {
       return location.pathname === '/dashboard';
     }
+    if (path === '/seller/dashboard') {
+      return location.pathname === '/seller/dashboard';
+    }
     return location.pathname.startsWith(path);
   };
-  const handleLogout = () => {
-    // Clear session and redirect to login
-    navigate('/login');
+
+  const openLogoutDialog = () => {
+    setIsLogoutDialogOpen(true);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabaseClient.auth.signOut();
+    } catch (error) {
+      console.error('Error during logout:', error);
+    } finally {
+      navigate('/login');
+    }
   };
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -174,6 +228,14 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
                 })()}
               </p>
             </div>
+            <button
+              type="button"
+              onClick={openLogoutDialog}
+              className="ml-2 p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+              aria-label="Logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </aside>
@@ -231,7 +293,7 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
           )}
             <div className="pt-4 mt-4 border-t border-slate-100">
               <button
-              onClick={handleLogout}
+              onClick={openLogoutDialog}
               className="flex items-center px-4 py-3 text-base font-medium text-red-600 rounded-md hover:bg-red-50 w-full">
 
                 <LogOut className="mr-3 h-5 w-5" />
@@ -296,7 +358,7 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
                 label: 'Logout',
                 icon: <LogOut className="h-4 w-4" />,
                 variant: 'danger',
-                onClick: handleLogout
+                onClick: openLogoutDialog
               }]
               } />
 
@@ -307,6 +369,16 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
           {children}
         </main>
       </div>
+      <ConfirmDialog
+        isOpen={isLogoutDialogOpen}
+        onClose={() => setIsLogoutDialogOpen(false)}
+        onConfirm={handleLogout}
+        title="Logout"
+        message="Are you sure to logout"
+        confirmText="Logout"
+        cancelText="Cancel"
+        isDestructive={true}
+      />
     </div>);
 
 }

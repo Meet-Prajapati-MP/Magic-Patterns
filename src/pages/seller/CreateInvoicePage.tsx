@@ -1140,9 +1140,16 @@ export function CreateInvoicePage() {
               placeholder="billing@acme.com"
               value={newClientEmail}
               onChange={(e) => {
-                setNewClientEmail(e.target.value);
+                const value = e.target.value;
+                // Update the Add Client modal state
+                setNewClientEmail(value);
+                // Also keep the main invoice Email Address in sync
+                setClientEmail(value);
+                if (clientEmailError) {
+                  setClientEmailError('');
+                }
                 if (addClientFormSubmitted) {
-                  setNewClientEmailError(validateEmail(e.target.value));
+                  setNewClientEmailError(validateEmail(value));
                 }
               }}
               error={addClientFormSubmitted ? newClientEmailError : ''} />

@@ -34,7 +34,7 @@ import { OnboardingPage } from './pages/auth/OnboardingPage';
 // Dev
 import { DevOTPInboxPage } from './pages/dev/DevOTPInboxPage';
 // Seller
-import { SellerDashboard } from './pages/seller/SellerDashboard';
+// import { SellerDashboard } from './pages/seller/SellerDashboard';
 import { InvoiceListPage } from './pages/seller/InvoiceListPage';
 import { CreateInvoicePage } from './pages/seller/CreateInvoicePage';
 // import { InvoiceDetailPage } from './pages/seller/InvoiceDetailPage';
@@ -171,8 +171,8 @@ function App() {
           <Route path="/payment/failure" element={<PaymentFailurePage />} />
           <Route path="/autopay/setup" element={<AutopaySetupPage />} />
           
-          {/* Seller Routes - Use Seller Pages */}
-          <Route path="/seller/dashboard" element={<SellerDashboard />} />
+          {/* Seller Routes - use unified HomePage for dashboard UI */}
+          <Route path="/seller/dashboard" element={<HomePage />} />
           <Route path="/seller/invoices" element={<InvoiceListPage />} />
           <Route path="/seller/invoices/create" element={<CreateInvoicePage />} />
 

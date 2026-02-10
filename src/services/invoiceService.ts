@@ -629,7 +629,9 @@ export async function createInvoice(
     // Step 7: Insert milestones if payment type is milestone or split
     if ((invoiceData.paymentType === 'milestone' || invoiceData.paymentType === 'split') 
         && invoiceData.milestones && invoiceData.milestones.length > 0) {
-      console.log(`🎯 Inserting ${invoiceData.milestones.length} invoice milestones...`);
+      console.log(`🎯 ========== STEP 7: INSERTING INVOICE MILESTONES ==========`);
+      console.log(`🎯 Payment type: ${invoiceData.paymentType}`);
+      console.log(`🎯 Number of milestones to insert: ${invoiceData.milestones.length}`);
       
       const milestonesPayload = invoiceData.milestones.map((milestone, index) => ({
         invoice_id: invoiceId,
@@ -675,6 +677,16 @@ export async function createInvoice(
       }
 
       console.log(`✅ Successfully inserted ${insertedMilestones.length} invoice milestones`);
+      console.log(`✅ Milestone data saved to invoice_milestones table`);
+    } else {
+      // Log why milestones are not being saved
+      if (invoiceData.paymentType === 'full') {
+        console.log('ℹ️ Step 7: Payment type is "full" - no milestones needed');
+      } else if (!invoiceData.milestones || invoiceData.milestones.length === 0) {
+        console.warn('⚠️ Step 7: Payment type requires milestones but no milestones provided');
+        console.warn('⚠️ Payment type:', invoiceData.paymentType);
+        console.warn('⚠️ Milestones array:', invoiceData.milestones);
+      }
     }
 
     // Step 8: Final verification - Check that invoice, items, and milestones are all saved
@@ -751,10 +763,90 @@ export async function createInvoice(
       }, null, 2));
     }
 
+    // Step 9: Create timeline entry for invoice creation
+    console.log('📅 ========== STEP 9: CREATING TIMELINE ENTRY ==========');
+    console.log('📅 Creating timeline entry for invoice creation...');
+    
+    const timelinePayload = {
+      invoice_id: invoiceId,
+      event_type: invoiceData.isDraft ? 'draft_created' : 'invoice_created',
+      description: invoiceData.isDraft 
+        ? `Invoice draft created by seller`
+        : `Invoice ${invoice?.invoice_number} created and sent to ${invoiceData.clientEmail}`,
+      metadata: {
+        seller_id: userId,
+        buyer_id: finalBuyerId || null,
+        client_email: invoiceData.clientEmail,
+        total_amount: invoiceData.totalAmount,
+        payment_type: invoiceData.paymentType,
+        status: invoice?.status || 'sent'
+      }
+    };
+    
+    console.log('📅 Timeline payload:', JSON.stringify(timelinePayload, null, 2));
+    
+    const { data: insertedTimeline, error: timelineError } = await supabaseClient
+      .from('invoice_timeline')
+      .insert(timelinePayload)
+      .select()
+      .single();
+    
+    if (timelineError) {
+      console.error('❌ ========== ERROR CREATING TIMELINE ENTRY ==========');
+      console.error('❌ Error Code:', timelineError.code);
+      console.error('❌ Error Message:', timelineError.message);
+      console.error('❌ Error Details:', timelineError.details);
+      console.error('❌ Error Hint:', timelineError.hint);
+      console.error('❌ Full Error:', JSON.stringify(timelineError, null, 2));
+      console.warn('⚠️ Invoice was created successfully, but timeline entry failed. This is non-critical.');
+      // Don't fail the entire operation if timeline fails - invoice is already saved
+    } else if (insertedTimeline) {
+      console.log('✅ ========== TIMELINE ENTRY CREATED ==========');
+      console.log('✅ Timeline ID:', insertedTimeline.id);
+      console.log('✅ Event Type:', insertedTimeline.event_type);
+      console.log('✅ Description:', insertedTimeline.description);
+      console.log('✅ Timeline entry saved successfully!');
+    } else {
+      console.warn('⚠️ Timeline insert returned no data (but no error). Timeline entry may not have been saved.');
+    }
+
+    // Step 10: Create timeline entry for milestones if they exist
+    if ((invoiceData.paymentType === 'milestone' || invoiceData.paymentType === 'split') 
+        && invoiceData.milestones && invoiceData.milestones.length > 0) {
+      console.log('📅 ========== STEP 10: CREATING TIMELINE ENTRIES FOR MILESTONES ==========');
+      console.log(`📅 Creating timeline entries for ${invoiceData.milestones.length} milestones...`);
+      
+      const milestoneTimelinePayloads = invoiceData.milestones.map((milestone, index) => ({
+        invoice_id: invoiceId,
+        event_type: 'milestone_created',
+        description: `Milestone ${index + 1}: ${milestone.description} - ${milestone.percentage}% (₹${milestone.amount.toLocaleString('en-IN')})`,
+        metadata: {
+          milestone_index: index,
+          milestone_description: milestone.description,
+          percentage: milestone.percentage,
+          amount: milestone.amount,
+          due_date: milestone.dueDate
+        }
+      }));
+      
+      const { data: insertedMilestoneTimelines, error: milestoneTimelineError } = await supabaseClient
+        .from('invoice_timeline')
+        .insert(milestoneTimelinePayloads)
+        .select();
+      
+      if (milestoneTimelineError) {
+        console.error('❌ Error creating milestone timeline entries:', milestoneTimelineError);
+        console.warn('⚠️ Milestones were saved, but timeline entries failed. This is non-critical.');
+      } else if (insertedMilestoneTimelines) {
+        console.log(`✅ Successfully created ${insertedMilestoneTimelines.length} milestone timeline entries`);
+      }
+    }
+
     console.log('🎉 ========== INVOICE CREATION COMPLETED ==========');
     console.log('🎉 Invoice ID:', invoiceId);
     console.log('🎉 Invoice Number:', invoice?.invoice_number);
     console.log('🎉 All data saved to Supabase invoices table!');
+    console.log('🎉 Timeline entries created!');
     console.log('🎉 ================================================');
     
     return { success: true, invoiceId };

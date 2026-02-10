@@ -1,6 +1,6 @@
 // import React from 'react';
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 // import { useNavigate } from 'react-router-dom';
 import {
   FileText,
@@ -20,10 +20,70 @@ import { Button } from '../../components/ui/Button';
 import { Card, CardContent } from '../../components/ui/Card';
 import { StatusPill } from '../../components/ui/StatusPill';
 import { useProfile } from '../../components/context/ProfileContext';
+import { getSellerInvoices, getBuyerInvoices } from '../../services/invoiceService';
 export function HomePage() {
   // const navigate = useNavigate();
   const { currentAccount } = useProfile();
+  const location = useLocation();
+  const isSellerRoute = location.pathname.startsWith('/seller');
+  const invoicesPath = isSellerRoute ? '/seller/invoices' : '/invoices';
+  const createInvoicePath = isSellerRoute ? '/seller/invoices/create' : '/invoices/create';
   const [searchQuery, setSearchQuery] = useState('');
+  const [stats, setStats] = useState({
+    invoicesSent: 0,
+    invoicesReceived: 0,
+    totalPaid: 0,
+    totalReceived: 0,
+    loading: true
+  });
+
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(amount || 0);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const [sellerResult, buyerResult] = await Promise.all([
+          getSellerInvoices(),
+          getBuyerInvoices()
+        ]);
+
+        const sellerInvoices = (sellerResult.data || []) as any[];
+        const buyerInvoices = (buyerResult.data || []) as any[];
+
+        const invoicesSent = sellerInvoices.length;
+        const invoicesReceived = buyerInvoices.length;
+
+        const totalReceived = sellerInvoices
+          .filter((inv) => inv.status === 'paid')
+          .reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+
+        const totalPaid = buyerInvoices
+          .filter((inv) => inv.status === 'paid')
+          .reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+
+        setStats({
+          invoicesSent,
+          invoicesReceived,
+          totalPaid,
+          totalReceived,
+          loading: false
+        });
+      } catch (error) {
+        console.error('Error fetching dashboard stats:', error);
+        setStats((prev) => ({
+          ...prev,
+          loading: false
+        }));
+      }
+    };
+
+    fetchStats();
+  }, []);
   const displayName =
   currentAccount.accountType === 'individual' ?
   currentAccount.name.split(' ')[0] :
@@ -41,12 +101,12 @@ export function HomePage() {
               You have 3 pending invoices totaling ₹1,14,500.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/invoices">
+              <Link to={invoicesPath}>
                 <Button className="bg-[#2C6CEE] text-white hover:bg-[#2456c4] border border-[#3777F0] shadow-md transition-colors duration-200">
                   View All Invoices
                 </Button>
               </Link>
-              <Link to="/invoices/create">
+              <Link to={createInvoicePath}>
                 <Button
                   variant="outline"
                   className="text-blue-700 border-[#DBEAFE] bg-white hover:bg-[#F0F9FF] transition-colors duration-200"
@@ -71,7 +131,9 @@ export function HomePage() {
                   <p className="text-sm font-medium text-slate-500">
                     Invoices Sent
                   </p>
-                  <p className="text-2xl font-bold text-slate-900 mt-1">12</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">
+                    {stats.loading ? '—' : stats.invoicesSent}
+                  </p>
                 </div>
                 <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
                   <FileText className="h-6 w-6" />
@@ -94,7 +156,9 @@ export function HomePage() {
                   <p className="text-sm font-medium text-slate-500">
                     Invoices Received
                   </p>
-                  <p className="text-2xl font-bold text-slate-900 mt-1">8</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">
+                    {stats.loading ? '—' : stats.invoicesReceived}
+                  </p>
                 </div>
                 <div className="h-12 w-12 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600">
                   <FileText className="h-6 w-6" />
@@ -114,7 +178,7 @@ export function HomePage() {
                     Total Paid
                   </p>
                   <p className="text-2xl font-bold text-slate-900 mt-1">
-                    ₹62,000
+                    {formatCurrency(stats.totalPaid)}
                   </p>
                 </div>
                 <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center text-green-600">
@@ -135,7 +199,7 @@ export function HomePage() {
                     Total Received
                   </p>
                   <p className="text-2xl font-bold text-slate-900 mt-1">
-                    ₹1,45,000
+                    {formatCurrency(stats.totalReceived)}
                   </p>
                 </div>
                 <div className="h-12 w-12 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600">
@@ -173,7 +237,7 @@ export function HomePage() {
               Action Required
             </h2>
             <Link
-              to="/invoices"
+              to={invoicesPath}
               className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center">
 
               See All <ArrowRight className="h-4 w-4 ml-1" />
@@ -319,7 +383,7 @@ export function HomePage() {
             <h3 className="font-bold text-slate-900">Quick Actions</h3>
             <div className="grid grid-cols-2 gap-4">
               <Link
-                to="/invoices"
+                to={invoicesPath}
                 className="bg-white p-4 rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-sm transition-all text-center flex flex-col items-center justify-center space-y-2 h-32">
 
                 <div className="h-10 w-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
@@ -330,7 +394,7 @@ export function HomePage() {
                 </span>
               </Link>
               <Link
-                to="/invoices/create"
+                to={createInvoicePath}
                 className="bg-white p-4 rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-sm transition-all text-center flex flex-col items-center justify-center space-y-2 h-32">
 
                 <div className="h-10 w-10 bg-green-50 rounded-full flex items-center justify-center text-green-600">

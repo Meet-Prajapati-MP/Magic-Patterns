@@ -634,7 +634,6 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authentic
 -- RLS POLICIES (starter policies using auth.uid())
 -- ============================================
 
--- profiles: owner can read/update their profile
 DROP POLICY IF EXISTS "Profiles: read own" ON profiles;
 CREATE POLICY "Profiles: read own"
 ON profiles
@@ -649,6 +648,17 @@ FOR UPDATE
 TO authenticated
 USING (id = (SELECT auth.uid()))
 WITH CHECK (id = (SELECT auth.uid()));
+
+-- Optional: allow authenticated users to read basic seller info (name/email)
+-- This is needed so buyers can see the seller name in their invoice list.
+-- If you prefer stricter privacy, comment this policy out and instead
+-- denormalize seller_name into the invoices table.
+DROP POLICY IF EXISTS "Profiles: read public seller info" ON profiles;
+CREATE POLICY "Profiles: read public seller info"
+ON profiles
+FOR SELECT
+TO authenticated
+USING (true);
 
 -- clients: seller can CRUD own clients
 DROP POLICY IF EXISTS "Clients: seller CRUD" ON clients;
